@@ -21,8 +21,9 @@ module Reggaexp
         dot:      '.',
         blank:    ['\s', '\t'],
         hex:      [0..9, 'a'..'F'],
-        alphanum: %i[letter number],
+        alphanum: %i[letter number]
       }.freeze
+      PRESET_KEYS = PRESETS.keys.flat_map { |k| [k, "#{k}s".to_sym] }.freeze
 
       def initialize
         @captures = []
@@ -47,10 +48,11 @@ module Reggaexp
       # we don't have to worry about 4 == '4' when deduplicating for example.
       def parse(*args, **opts)
         flat_args = args.flatten
-        flat_args = flat_args.concat(symbols(flat_args))
+        flat_args = with_presets flat_args
         atoms     = [*ranges(flat_args),
                      *numerics(flat_args),
                      *strings(flat_args),
+                     *symbols(flat_args),
                      *bools(flat_args)]
 
         @captures << opts.merge(clause: clauses.size) if opts.any?
@@ -78,15 +80,23 @@ module Reggaexp
                  .map(&:to_s).uniq
       end
 
-      # filter symbols and treat them like strings
+      # filter symbols and treat them like regular strings / chars
       def symbols(flat_args)
-        flat_args.select(&Symbol.method(:===)).flat_map do |preset|
-          singular = preset.to_s.gsub(/s$/, '').to_sym
+        strings flat_args.select(&Symbol.method(:===)).map(&:to_s)
+      end
+
+      # filter symbol presets
+      def with_presets(flat_args)
+        presets = flat_args.select(&Symbol.method(:===)).flat_map do |preset|
+          singular = preset.to_s.gsub(/(?<=.)s$/, '').to_sym
           value    = PRESETS[singular]
 
           next map_preset_array value if value.is_a? Array
+
           value
         end.compact
+
+        (flat_args - PRESET_KEYS) | presets
       end
 
       def map_preset_array(preset_values)
@@ -94,7 +104,7 @@ module Reggaexp
           case value
           when Array then map_preset_array value
           when Symbol
-            next PRESETS[value] unless PRESETS[value].is_a? Array
+            next PRESETS[value] || value unless PRESETS[value].is_a? Array
 
             map_preset_array PRESETS[value]
           else

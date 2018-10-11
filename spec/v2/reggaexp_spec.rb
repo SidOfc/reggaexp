@@ -34,6 +34,12 @@ RSpec.describe Reggaexp do
           contain_exactly('\w', '0'..'9', 'a'..'z', 'A'..'Z')
         )
       end
+
+      it 'recognizes plural presets' do
+        expect(clause(:words, :numbers, :letters)).to(
+          contain_exactly('\w', '0'..'9', 'a'..'z', 'A'..'Z')
+        )
+      end
     end
 
     context 'Ranges' do
