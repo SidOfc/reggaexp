@@ -1,0 +1,10 @@
+---
+Style/MethodMissingSuper:
+  Enabled: False
+
+Metrics/ClassLength:
+  Max: 250
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
