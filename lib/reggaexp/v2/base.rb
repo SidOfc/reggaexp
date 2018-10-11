@@ -6,7 +6,7 @@ module Reggaexp
   module V2
     # Reggaexp::V2::Base includes all the core logic for the public interface
     class Base
-      attr_reader :clauses, :flags, :captures
+      attr_reader :clauses
 
       # characters that need to be escaped outside and within a
       # character-class respectively.
@@ -76,8 +76,10 @@ module Reggaexp
       # e.g. true  # => 'true'
       #      false # => 'false'
       def bools(flat_args)
-        flat_args.select { |b| [TrueClass, FalseClass].include? b }
+        # rubocop:disable Style/CaseEquality
+        flat_args.select { |b| b === true || b === false }
                  .map(&:to_s).uniq
+        # rubocop:enable Style/CaseEquality
       end
 
       # filter symbols and treat them like regular strings / chars

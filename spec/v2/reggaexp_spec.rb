@@ -40,6 +40,19 @@ RSpec.describe Reggaexp do
           contain_exactly('\w', '0'..'9', 'a'..'z', 'A'..'Z')
         )
       end
+
+      it 'maps nested presets' do
+        expect(clause(:alphanum)).to(
+          contain_exactly('0'..'9', 'a'..'z', 'A'..'Z')
+        )
+      end
+    end
+
+    context 'Bools' do
+      it 'stringifies true' do
+        expect(clause(true)).to  contain_exactly 'true'
+        expect(clause(false)).to contain_exactly 'false'
+      end
     end
 
     context 'Ranges' do
