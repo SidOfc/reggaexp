@@ -19,11 +19,19 @@ module Reggaexp
         upper:    'A'..'Z',
         lower:    'a'..'z',
         dot:      '.',
-        blank:    ['\s', '\t'],
-        hex:      [0..9, 'a'..'F'],
+        blank:    [' ', '\t'],
+        hex:      [:number, 'a'..'F'],
         alphanum: %i[letter number]
       }.freeze
-      PRESET_KEYS = PRESETS.keys.flat_map { |k| [k, "#{k}s".to_sym] }.freeze
+
+      PRESET_ALIASSES = {
+        digit: :number,
+        char: :letter,
+        character: :letter,
+      }.freeze
+
+      PRESET_KEYS = (PRESETS.keys + PRESET_ALIASSES.keys)
+                    .flat_map { |k| [k, "#{k}s".to_sym] }.freeze
 
       def initialize
         @captures = []
@@ -91,6 +99,7 @@ module Reggaexp
       def with_presets(flat_args)
         presets = flat_args.select(&Symbol.method(:===)).flat_map do |preset|
           singular = preset.to_s.gsub(/(?<=.)s$/, '').to_sym
+          singular = PRESET_ALIASSES.fetch singular, singular
           value    = PRESETS[singular]
 
           next map_preset_array value if value.is_a? Array
