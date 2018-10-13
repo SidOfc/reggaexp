@@ -25,8 +25,8 @@ module Reggaexp
       }.freeze
 
       PRESET_ALIASSES = {
-        digit: :number,
-        char: :letter,
+        digit:     :number,
+        char:      :letter,
         character: :letter,
       }.freeze
 
@@ -72,13 +72,13 @@ module Reggaexp
 
       # filter elements for a character class
       def character_class(flat_args)
-        flat_args.select { |a| a.is_a?(String) && a.length == 1 } +
+        flat_args.select { |a| a.is_a?(String) && a.tr('\\', '').length == 1 } +
           flat_args.select(&Range.method(:===))
       end
 
       # filter elements for a non-capturing group
       def non_capturing_group(flat_args)
-        flat_args.select { |a| a.is_a?(String) && a.length > 1 }
+        flat_args.select { |a| a.is_a?(String) && a.tr('\\', '').length > 1 }
       end
 
       # stringify boolean values to their string counterparts
@@ -190,7 +190,7 @@ module Reggaexp
           ''
         end.join
 
-        Regexp.new expression, flag_value
+        Regexp.compile expression, flag_value
       end
 
       # parse atoms from a single 'parse' call
