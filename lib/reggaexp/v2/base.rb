@@ -178,8 +178,8 @@ module Reggaexp
         expression = clauses.map.with_index do |atoms, idx|
           strs = exprs_from_atoms atoms
 
-          next maybe_capture idx, strs.first if strs.size == 1
-          next capture_or_non_capture idx, strs.join('|') if strs.any?
+          next parse_atom idx, strs.first if strs.size == 1
+          next parse_atom idx, strs.join('|'), non_capture: true if strs.any?
 
           ''
         end.join
@@ -187,12 +187,62 @@ module Reggaexp
         Regexp.new expression, flag_value
       end
 
+      def parse_atom(clause_idx, content, **opts)
+        opts = info_for_clause(clause_idx).merge opts
+
+        maybe_with_capture(content, **opts) +
+          maybe_with_quantifier(nil, **opts)
+      end
+
+      def maybe_simplify_quantifier(quantifier)
+        if quantifier.is_a?(Array) || quantifier.is_a?(Range)
+          min, max = [quantifier.first, quantifier.last].map(&:to_i)
+
+          return ''  if min == max && min == 1
+          return '+' if quantifier.last.nil? && min == 1
+          return '*' if quantifier.last.nil? && min == 0
+          return '?' if min == 0 && max == 1
+        end
+
+        quantifier
+      end
+
+      def maybe_with_quantifier(content, **opts)
+        q = opts.fetch :quantifier, nil
+        q = maybe_simplify_quantifier q
+
+        return "#{content}{#{q.first},#{q.last}}" if q.is_a?(Array) ||
+                                                     q.is_a?(Range)
+
+        return "#{content}{#{q}}" if q.to_s =~ /\A\d+\z/
+
+        "#{content}#{q}"
+      end
+
+      def maybe_with_capture(content, **opts)
+        name      = opts.fetch :as, nil
+        capture   = opts.fetch :capture, name ? true : false
+        non_capt  = opts.fetch :non_capture, false
+        capt_type = non_capt ? '?:' : ''
+
+        str  = (capture || non_capt ? '(' : '')
+        str += (name ? "?<#{name}>" : capt_type)
+        str += content
+
+        str + (capture || non_capt ? ')' : '')
+      end
+
       def exprs_from_atoms(atoms)
         atoms = atoms_after_flags atoms
         chars = character_class atoms
         chars = chars.map { |c| c.is_a?(Range) ? range_bounds(c).join('-') : c }
         strs  = non_capturing_group atoms
-        strs << "[#{chars.join}]" if chars.any?
+
+        if chars.size == 1 && chars.first.tr('\\', '').match(/\A.\z/)
+          strs << chars.first
+        elsif chars.any?
+          strs << "[#{chars.join}]"
+        end
 
         strs
       end
@@ -209,26 +259,8 @@ module Reggaexp
         (strs + rngs).uniq
       end
 
-      def maybe_capture(clause_idx, content)
-        if (cpt = info_for_clause clause_idx)
-          opening = cpt[:as] ? "?<#{cpt[:as]}>" : ''
-
-          "(#{opening}#{content})"
-        else
-          content
-        end
-      end
-
-      def capture_or_non_capture(clause_idx, content)
-        cpt     = info_for_clause clause_idx
-        named   = cpt && cpt[:as] ? "?<#{cpt[:as]}>" : ''
-        opening = cpt ? named : '?:'
-
-        "(#{opening}#{content})"
-      end
-
       def info_for_clause(idx)
-        @captures.detect { |h| h[:clause] == idx }
+        @captures.detect { |h| h[:clause] == idx } || {}
       end
 
       # append an clause to the end of the pattern and return self.
