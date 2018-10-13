@@ -143,7 +143,7 @@ RSpec.describe Reggaexp do
     end
   end
 
-  context 'Groups' do
+  context 'Capture groups and non capture groups' do
     it 'filters multi-character strings for non-capture-group usage' do
       expect(non_capturing_group('a', 'abc', 'q', 123, :b)).to(
         contain_exactly('123', 'abc')
@@ -217,6 +217,16 @@ RSpec.describe Reggaexp do
 
     it 'removes duplicate ranges with case-insensitive flag' do
       expect(with_flags(:i).parse(:a..:z, :A..:Z).pattern).to eq(/[a-z]/i)
+    end
+  end
+
+  context 'Escaping' do
+    it 'escapes special characters outside character classes' do
+      expect(pattern('$|^*+.[({})]') =~ '$|^*+.[({})]').to be_truthy
+    end
+
+    it 'escapes special characters inside character classes' do
+      expect(pattern('$', ']', '-', :a..:f)).to eq(/[$\]\-a-f]/)
     end
   end
 end
