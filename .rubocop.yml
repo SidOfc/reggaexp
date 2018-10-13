@@ -1,4 +1,7 @@
 ---
+AllCops:
+  TargetRubyVersion: 2.2
+
 Style/MethodMissingSuper:
   Enabled: False
 
