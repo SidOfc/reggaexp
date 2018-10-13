@@ -46,11 +46,20 @@ RSpec.describe Reggaexp do
           contain_exactly('0'..'9', 'a'..'z', 'A'..'Z')
         )
       end
+
+      it 'supports aliases' do
+        expect(clause(:digits)).to     eq clause(:numbers)
+        expect(clause(:chars)).to      eq clause(:letters)
+        expect(clause(:characters)).to eq clause(:letters)
+      end
     end
 
     context 'Bools' do
       it 'stringifies true' do
         expect(clause(true)).to  contain_exactly 'true'
+      end
+
+      it 'stringifies false' do
         expect(clause(false)).to contain_exactly 'false'
       end
     end
@@ -126,7 +135,11 @@ RSpec.describe Reggaexp do
     end
 
     it 'creates a character class with single-length strings and ranges' do
-      expect(builder.parse(:q, :a..:f).pattern).to eq(/[qa-f]/)
+      expect(pattern(:q, :a..:f)).to eq(/[qa-f]/)
+    end
+
+    it 'only generates a character class when needed' do
+      expect(pattern(:q)).to eq(/q/)
     end
   end
 
@@ -142,6 +155,11 @@ RSpec.describe Reggaexp do
       expect(match_data[1]).to eq 'hello'
     end
 
+    it 'does not create a capture group when capture: false' do
+      match_data = pattern('hello', capture: false).match('hello')
+      expect(match_data[1]).to be_nil
+    end
+
     it 'creates a named capture group when as: :name is given' do
       match_data = pattern('hello', as: :name).match('hello')
       expect(match_data[:name]).to eq 'hello'
@@ -152,13 +170,52 @@ RSpec.describe Reggaexp do
     end
   end
 
+  context 'Quantifiers' do
+    it 'applies "one_or_more"' do
+      expect(pattern('a', quantifier: '+')).to eq(/a+/)
+    end
+
+    it 'applies "zero_or_more"' do
+      expect(pattern('a', quantifier: '*')).to eq(/a*/)
+    end
+
+    it 'applies "optional"' do
+      expect(pattern('a', quantifier: '?')).to eq(/a?/)
+    end
+
+    it 'applies "between"' do
+      expect(pattern('a', quantifier: 1..3)).to   eq(/a{1,3}/)
+      expect(pattern('a', quantifier: [1, 3])).to eq(/a{1,3}/)
+    end
+
+    it 'does not apply redundant quantifier' do
+      expect(pattern('a', quantifier: [1])).to eq(/a/)
+      expect(pattern('a', quantifier: [1, 1])).to eq(/a/)
+    end
+
+    it 'simplifies between(1, inf) to "+"' do
+      expect(pattern('a', quantifier: [1, nil])).to eq(/a+/)
+    end
+
+    it 'simplifies between(0, inf) to "*"' do
+      expect(pattern('a', quantifier: [0, nil])).to eq(/a*/)
+    end
+
+    it 'simplifies between(0, 1) to "?"' do
+      expect(pattern('a', quantifier: [0, 1])).to eq(/a?/)
+    end
+  end
+
   context 'Flags' do
     it 'sets flags on a regular expression' do
       expect(with_flags(:i, :m, :x).pattern).to eq(//mix)
     end
 
-    it 'downcases all uppercase groups with case-insensitive regexp' do
+    it 'downcases all uppercase groups with case-insensitive flag' do
       expect(with_flags(:i).parse(:a..:d, :X..:Z).pattern).to eq(/[x-za-d]/i)
+    end
+
+    it 'removes duplicate ranges with case-insensitive flag' do
       expect(with_flags(:i).parse(:a..:z, :A..:Z).pattern).to eq(/[a-z]/i)
     end
   end
