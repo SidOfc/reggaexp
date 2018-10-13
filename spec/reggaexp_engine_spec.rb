@@ -129,6 +129,28 @@ RSpec.describe Reggaexp do
     end
 
     context 'Expression components' do
+      context 'Start and end of line / string' do
+        it 'creates a pattern matching the start of a line' do
+          expect(pattern('abc', prepend: '^')).to match 'abc'
+          expect(pattern('abc', prepend: '^')).not_to match 'xabc'
+        end
+
+        it 'creates a pattern matching the start of a string' do
+          expect(pattern('abc', prepend: '\A')).to match "abc"
+          expect(pattern('abc', prepend: '\A')).not_to match "\nabc"
+        end
+
+        it 'creates a pattern matching the end of a line' do
+          expect(pattern('abc', append: '$')).to match "abc"
+          expect(pattern('abc', append: '$')).not_to match "abcx"
+        end
+
+        it 'creates a pattern matching the end of a string' do
+          expect(pattern('abc', append: '\z')).to match "abc"
+          expect(pattern('abc', append: '\z')).not_to match "abc\n"
+        end
+      end
+
       context 'Character classes' do
         it 'filters single-character strings for character-class usage' do
           expect(character_class('a', 'abc', 'q', 1, :b)).to(

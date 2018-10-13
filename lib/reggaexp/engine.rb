@@ -255,8 +255,22 @@ module Reggaexp
     def parse_atom(clause_idx, content, **opts)
       opts = info_for_clause(clause_idx).merge opts
 
-      maybe_with_capture(content, **opts) +
-        maybe_with_quantifier(nil, **opts)
+      maybe_prepend(nil, **opts) +
+        maybe_with_capture(content, **opts) +
+        maybe_with_quantifier(nil, **opts) +
+        maybe_append(nil, **opts)
+    end
+
+    def maybe_prepend(content, **opts)
+      return content.to_s unless opts.key? :prepend
+
+      "#{opts[:prepend]}#{content}"
+    end
+
+    def maybe_append(content, **opts)
+      return content.to_s unless opts.key? :append
+
+      "#{opts[:append]}#{content}"
     end
 
     # removes redundant quantifiers like {1,} or {1}
