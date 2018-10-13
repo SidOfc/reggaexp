@@ -38,11 +38,19 @@ module Reggaexp
     end
 
     # set flags of regular expression
-    def flags(*flag_args)
+    def add_flags(*flag_args)
       @flags = (@flags + flag_args).uniq
 
       self
     end
+    alias add_flag add_flags
+
+    def remove_flags(*flag_args)
+      @flags -= flag_args
+
+      self
+    end
+    alias remove_flag remove_flags
 
     # parses arguments given to any function like #one_or_more or #between
     # and processes it to produce the right clauses.
@@ -191,6 +199,15 @@ module Reggaexp
       Regexp.compile expression, flag_value
     end
 
+    # comparison operators
+    def match(other, pos = 0)
+      pattern.match other, pos
+    end
+
+    def match?(other, pos = 0)
+      pattern.match? other, pos
+    end
+
     def !~(other)
       pattern !~ other
     end
@@ -207,8 +224,30 @@ module Reggaexp
       pattern == other
     end
 
+    def ===(other)
+      pattern === other
+    end
+
     def <=>(other)
       pattern <=> other
+    end
+
+    def ~
+      self =~ $_
+    end
+
+    def method_missing(mtd, *args, &block)
+      super unless regexp_method? mtd
+
+      pattern.send mtd, *args, &block
+    end
+
+    def respond_to_missing?(mtd, _include_private = false)
+      regexp_method? mtd
+    end
+
+    def regexp_method?(sym)
+      Regexp.instance_methods.include? sym
     end
 
     # parse atoms from a single 'parse' call

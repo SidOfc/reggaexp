@@ -8,7 +8,7 @@ RSpec.describe Reggaexp do
   end
 
   def with_flags(*flags)
-    builder.flags(*flags)
+    builder.add_flags(*flags)
   end
 
   def clause(*args, **opts)
@@ -16,7 +16,7 @@ RSpec.describe Reggaexp do
   end
 
   def pattern(*args, **opts)
-    builder.parse(*args, **opts).pattern
+    builder.parse(*args, **opts)
   end
 
   def character_class(*args)
@@ -209,16 +209,20 @@ RSpec.describe Reggaexp do
       end
 
       context 'Flags' do
-        it 'sets flags on a regular expression' do
-          expect(with_flags(:i, :m, :x).pattern).to eq(//mix)
+        it 'adds flags' do
+          expect(builder.add_flags(:i, :m, :x)).to eq(//mix)
+        end
+
+        it 'removes flags' do
+          expect(builder.add_flag(:i).remove_flag(:i)).to eq(//)
         end
 
         it 'downcases all uppercase groups with case-insensitive flag' do
-          expect(with_flags(:i).parse(:a..:d, :X..:Z).pattern).to eq(/[x-za-d]/i)
+          expect(with_flags(:i).parse(:a..:d, :X..:Z)).to eq(/[x-za-d]/i)
         end
 
         it 'removes duplicate ranges with case-insensitive flag' do
-          expect(with_flags(:i).parse(:a..:z, :A..:Z).pattern).to eq(/[a-z]/i)
+          expect(with_flags(:i).parse(:a..:z, :A..:Z)).to eq(/[a-z]/i)
         end
       end
 
@@ -233,14 +237,69 @@ RSpec.describe Reggaexp do
       end
     end
 
-    context 'Comparison' do
-      it 'acts like a regular expression' do
+    context 'Mimicks Regexp' do
+      it 'responds to #match' do
+        expect(pattern).to respond_to :match
+      end
 
+      it 'responds to #match?' do
+        expect(pattern).to respond_to :match?
+      end
+
+      it 'responds to #!~' do
+        expect(pattern).to respond_to :!~
+      end
+
+      it 'responds to #=~' do
+        expect(pattern).to respond_to :=~
+      end
+
+      it 'responds to #===' do
+        expect(pattern).to respond_to :===
+      end
+
+      it 'responds to #==' do
+        expect(pattern).to respond_to :==
+      end
+
+      it 'responds to #!=' do
+        expect(pattern).to respond_to :!=
+      end
+
+      it 'responds to #<=>' do
+        expect(pattern).to respond_to :<=>
+      end
+
+      it 'responds to #~' do
+        expect(pattern).to respond_to :<=>
+      end
+
+      it 'responds to #source' do
+        expect(pattern).to respond_to :source
+      end
+
+      it 'responds to #options' do
+        expect(pattern).to respond_to :options
+      end
+
+      it 'responds to #named_captures' do
+        expect(pattern).to respond_to :named_captures
+      end
+
+      it 'responds to #names' do
+        expect(pattern).to respond_to :names
+      end
+
+      it 'responds to #to_s' do
+        expect(pattern).to respond_to :to_s
+      end
+
+      it 'does not respond to #to_a' do
+        expect(pattern).not_to respond_to :to_a
       end
     end
   end
 
   context Reggaexp::Expression do
-
   end
 end
