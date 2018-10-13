@@ -39,6 +39,7 @@ module Reggaexp
         @flags    = []
       end
 
+      # set flags of regular expression
       def flags(*flag_args)
         @flags = (@flags + flag_args).uniq
 
@@ -95,7 +96,7 @@ module Reggaexp
         strings flat_args.select(&Symbol.method(:===)).map(&:to_s)
       end
 
-      # filter symbol presets
+      # filter symbol presets recursively
       def with_presets(flat_args)
         presets = flat_args.select(&Symbol.method(:===)).flat_map do |preset|
           singular = preset.to_s.gsub(/(?<=.)s$/, '').to_sym
@@ -110,6 +111,8 @@ module Reggaexp
         (flat_args - PRESET_KEYS) | presets
       end
 
+      # recursively walk symbol arrays to find their
+      # actual preset value
       def map_preset_array(preset_values)
         preset_values.flat_map do |value|
           case value
@@ -158,6 +161,7 @@ module Reggaexp
         [range.first, range.last]
       end
 
+      # turns 'a'..'Z' and 'A'..'z' into [a-zA-Z]
       def explode_multi_case_ranges(ranges)
         ranges.map(&method(:range_bounds)).each_with_object [] do |bounds, ary|
           if mixed_case_bounds? bounds
@@ -169,11 +173,13 @@ module Reggaexp
         end
       end
 
+      # check if range has a lowercase and uppercase boundary
       def mixed_case_bounds?(bounds)
         bounds.any? { |b| /[[:lower:]]/.match b } &&
           bounds.any? { |b| /[[:upper:]]/.match b }
       end
 
+      # build the actual pattern
       def pattern
         expression = clauses.map.with_index do |atoms, idx|
           strs = exprs_from_atoms atoms
@@ -187,6 +193,8 @@ module Reggaexp
         Regexp.new expression, flag_value
       end
 
+      # parse atoms from a single 'parse' call
+      # the content argument will be the atoms stringified
       def parse_atom(clause_idx, content, **opts)
         opts = info_for_clause(clause_idx).merge opts
 
@@ -194,6 +202,7 @@ module Reggaexp
           maybe_with_quantifier(nil, **opts)
       end
 
+      # removes redundant quantifiers like {1,} or {1}
       def maybe_simplify_quantifier(quantifier)
         if quantifier.is_a?(Array) || quantifier.is_a?(Range)
           min, max = [quantifier.first, quantifier.last].map(&:to_i)
@@ -207,6 +216,7 @@ module Reggaexp
         quantifier
       end
 
+      # check if a quantifier is present in opts and process it
       def maybe_with_quantifier(content, **opts)
         q = opts.fetch :quantifier, nil
         q = maybe_simplify_quantifier q
@@ -219,6 +229,8 @@ module Reggaexp
         "#{content}#{q}"
       end
 
+      # check if either a capture or non capture group must be generated
+      # from given opts.
       def maybe_with_capture(content, **opts)
         name      = opts.fetch :as, nil
         capture   = opts.fetch :capture, name ? true : false
@@ -232,6 +244,8 @@ module Reggaexp
         str + (capture || non_capt ? ')' : '')
       end
 
+      # converts ranges to correct min-max format and puts
+      # all single chars in one character class
       def exprs_from_atoms(atoms)
         atoms = atoms_after_flags atoms
         chars = character_class atoms
@@ -247,6 +261,7 @@ module Reggaexp
         strs
       end
 
+      # apply flags to atoms and remove duplicates
       def atoms_after_flags(flat_args)
         strs = flat_args.reject(&Range.method(:===))
         rngs = flat_args.select(&Range.method(:===))
@@ -259,6 +274,7 @@ module Reggaexp
         (strs + rngs).uniq
       end
 
+      # grab options passed for a given #parse call
       def info_for_clause(idx)
         @captures.detect { |h| h[:clause] == idx } || {}
       end
@@ -345,6 +361,8 @@ module Reggaexp
         end.join
       end
 
+      # parse value of known flags into Regexp.compile
+      # compatible integer
       def flag_value
         @flags.reduce(0) do |val, flag|
           case flag.to_sym
