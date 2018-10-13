@@ -1,7 +1,7 @@
 RSpec.describe Reggaexp do
-  context Reggaexp::Base do
+  context Reggaexp::Engine do
     context '#map_patterns' do
-      let!(:builder) { Reggaexp::Expression.new }
+      let!(:builder) { Reggaexp::BaseExpression.new }
 
       it 'maps :digit and :digits to [0-9]' do
         expect(builder.map_patterns(:digit)).to  include '0-9'

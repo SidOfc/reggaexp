@@ -2,12 +2,13 @@
 
 require 'reggaexp/version'
 require 'reggaexp/base'
-require 'reggaexp/v2/base'
+require 'reggaexp/engine'
+require 'reggaexp/expression'
 
 # Reggaexp main module
 module Reggaexp
   def self.method_missing(method, *args, &block)
-    Expression.new.send method, *args, &block
+    BaseExpression.new.send method, *args, &block
   end
 
   def self.respond_to_missing?(*)
@@ -15,7 +16,7 @@ module Reggaexp
   end
 
   # Reggaexp::Expression builds regular expressions using method chaining style
-  class Expression < Base
+  class BaseExpression < Base
     def case_insensitive
       add_flag :i
     end
