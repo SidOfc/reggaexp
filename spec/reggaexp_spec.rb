@@ -500,6 +500,48 @@ RSpec.describe Reggaexp do
   end
 
   context 'Examples' do
+    context 'Phone numbers' do
+      let!(:pattern) do
+        Reggaexp
+          .start_of_string
+          .group { maybe('(').min(3, :digits).maybe(')') }
+          .or {
+            maybe('+')
+              .maybe_multiple(:whitespace)
+              .between(1..5, :digits)
+              .maybe_multiple(:whitespace)
+              .between(1..4, :digits)
+          }
+          .maybe_multiple(:whitespace)
+          .then(3, :digits)
+          .maybe_multiple(:whitespace)
+          .maybe('-')
+          .maybe_multiple(:whitespace)
+          .between(4..6, :digits)
+      end
+
+      it 'matches a US phone number' do
+        expect(pattern =~ '(415) 555 - 1234').to be_truthy
+        expect(pattern =~ '+ 1 415 5551234').to  be_truthy
+        expect(pattern =~ '+1 415 5551234').to   be_truthy
+        expect(pattern =~ '+14155551234').to     be_truthy
+      end
+
+      it 'matches a UK phone number' do
+        expect(pattern =~ '015 555 - 1234').to  be_truthy
+        expect(pattern =~ '+ 44 15 5551234').to be_truthy
+        expect(pattern =~ '+44 15 5551234').to  be_truthy
+        expect(pattern =~ '+44155551234').to    be_truthy
+      end
+
+      it 'matches a NL phone number' do
+        expect(pattern =~ '0031 6 12345678').to  be_truthy
+        expect(pattern =~ '+31 6 12345678').to   be_truthy
+        expect(pattern =~ '+31 010 12345678').to be_truthy
+        expect(pattern =~ '+31612345678').to     be_truthy
+      end
+    end
+
     context 'Email address' do
       let!(:pattern) do
         Reggaexp

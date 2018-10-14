@@ -128,6 +128,7 @@ module Reggaexp
         parse(*args.compact, &block)
       end
     end
-    alias then find
+    alias then   find
+    alias one_of find
   end
 end
