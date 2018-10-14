@@ -31,10 +31,23 @@ module Reggaexp
     PRESET_KEYS = (PRESETS.keys + PRESET_ALIASSES.keys)
                   .flat_map { |k| [k, "#{k}s".to_sym] }.freeze
 
-    def initialize
-      @captures = []
-      @clauses  = []
-      @flags    = []
+    def initialize(&block)
+      @clause_opts = []
+      @clauses     = []
+      @flags       = []
+      @block       = block if block_given?
+
+      instance_eval(&@block) if @block
+    end
+
+    def reset
+      @clause_opts = []
+      @clauses     = []
+      @flags       = []
+
+      instance_eval(&@block) if @block
+
+      self
     end
 
     # set flags of regular expression
@@ -70,8 +83,14 @@ module Reggaexp
                    *symbols(flat_args),
                    *bools(flat_args)]
 
-      @captures << opts.merge(clause: clauses.size) if opts.any?
-      append_clause atoms
+      append_clause atoms, opts.merge(clause: clauses.size)
+
+      self
+    end
+
+    def or(*args)
+      parse or: true
+      parse *args if args.any?
 
       self
     end
@@ -187,16 +206,20 @@ module Reggaexp
 
     # build the actual pattern
     def pattern
-      expression = clauses.map.with_index do |atoms, idx|
+      Regexp.compile compiled_pattern, flag_value
+    end
+
+    def compiled_pattern
+      compiled = clauses.map.with_index do |atoms, idx|
         strs = exprs_from_atoms atoms
 
         next parse_atom idx, strs.first if strs.size == 1
-        next parse_atom idx, strs.join('|'), non_capture: true if strs.any?
+        next parse_atom idx, strs.join('|'), non_capture: !in_or? if strs.any?
 
-        ''
-      end.join
+        parse_atom idx, ''
+      end
 
-      Regexp.compile expression, flag_value
+      compiled.join
     end
 
     # comparison operators
@@ -250,6 +273,26 @@ module Reggaexp
       Regexp.instance_methods.include? sym
     end
 
+    def alternating_or?
+      clauses  = @clause_opts.map.with_index { |h, idx| h.key?(:or) }
+      expected = !clauses.shift
+
+      clauses.all? do |bool|
+        alternated = bool == expected
+        expected   = !expected
+
+        alternated
+      end
+    end
+
+    def or_prev?(**opts)
+      info_for_clause(opts[:clause] - 1).key? :or
+    end
+
+    def or_next?(**opts)
+      info_for_clause(opts[:clause] + 1).key? :or
+    end
+
     # parse atoms from a single 'parse' call
     # the content argument will be the atoms stringified
     def parse_atom(clause_idx, content, **opts)
@@ -261,16 +304,30 @@ module Reggaexp
         maybe_append(nil, **opts)
     end
 
-    def maybe_prepend(content, **opts)
-      return content.to_s unless opts.key? :prepend
+    def in_or?
+      @in_or ? true : false
+    end
 
-      "#{opts[:prepend]}#{content}"
+    def maybe_prepend(content, **opts)
+      if !alternating_or? && !or_prev?(**opts) && or_next?(**opts)
+        @in_or = true
+        opening = '(?:'
+      end
+
+      return "#{opening}#{content}" unless opts.key? :prepend
+
+      "#{opening}#{opts[:prepend]}#{content}"
     end
 
     def maybe_append(content, **opts)
-      return content.to_s unless opts.key? :append
+      if !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
+        @in_or = false
+        closing = ')'
+      end
 
-      "#{opts[:append]}#{content}"
+      return "#{content}#{closing}" unless opts.key? :append
+
+      "#{content}#{opts[:append]}#{closing}"
     end
 
     # removes redundant quantifiers like {1,} or {1}
@@ -307,6 +364,8 @@ module Reggaexp
       capture   = opts.fetch :capture, name ? true : false
       non_capt  = opts.fetch :non_capture, false
       capt_type = non_capt ? '?:' : ''
+
+      return '|' if opts.key? :or
 
       str  = (capture || non_capt ? '(' : '')
       str += (name ? "?<#{name}>" : capt_type)
@@ -347,12 +406,13 @@ module Reggaexp
 
     # grab options passed for a given #parse call
     def info_for_clause(idx)
-      @captures.detect { |h| h[:clause] == idx } || {}
+      @clause_opts.detect { |h| h[:clause] == idx } || {}
     end
 
     # append an clause to the end of the pattern and return self.
-    def append_clause(content)
-      @clauses << content
+    def append_clause(content, opts)
+      @clause_opts << opts
+      @clauses     << content
 
       self
     end
@@ -441,6 +501,18 @@ module Reggaexp
         when :i then val | Regexp::IGNORECASE
         when :x then val | Regexp::EXTENDED
         end
+      end
+    end
+
+    if defined? Pry
+      def pry
+        binding.pry
+      end
+    end
+
+    if binding.respond_to? :irb
+      def irb
+        binding.irb
       end
     end
   end

@@ -7,6 +7,10 @@ RSpec.describe Reggaexp do
     Reggaexp::Engine.new
   end
 
+  def expr
+    Reggaexp::Expression.new
+  end
+
   def with_flags(*flags)
     builder.add_flags(*flags)
   end
@@ -323,5 +327,62 @@ RSpec.describe Reggaexp do
   end
 
   context Reggaexp::Expression do
+    it '#start_of_line' do
+      expect(expr.start_of_line).to eq(/^/)
+      expect(expr.start_of_line(:a..:z)).to eq(/^[a-z]/)
+    end
+
+    it '#start_of_string' do
+      expect(expr.start_of_string).to eq(/\A/)
+      expect(expr.start_of_string(:a..:z)).to eq(/\A[a-z]/)
+    end
+
+    it '#end_of_line' do
+      expect(expr.end_of_line).to eq(/$/)
+      expect(expr.end_of_line(:a..:z)).to eq(/[a-z]$/)
+    end
+
+    it '#end_of_string' do
+      expect(expr.end_of_string).to eq(/\z/)
+      expect(expr.end_of_string(:a..:z)).to eq(/[a-z]\z/)
+    end
+
+    it '#zero_or_one' do
+      expect(expr.zero_or_one(:a)).to eq(/a?/)
+    end
+
+    it '#zero_or_more' do
+      expect(expr.zero_or_more(:a)).to eq(/a*/)
+    end
+
+    it '#one_or_more' do
+      expect(expr.one_or_more(:a)).to eq(/a+/)
+    end
+
+    it '#between' do
+      expect(expr.between(1..4, :a)).to eq(/a{1,4}/)
+    end
+
+    it '#at_most' do
+      expect(expr.at_most(3, :a)).to eq(/a{,3}/)
+    end
+
+    it '#at_least' do
+      expect(expr.at_least(3, :a)).to eq(/a{3,}/)
+    end
+
+    it '#or' do
+      expect(expr.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
+      expect(expr.at_least(3, :a).or.at_most(2, :b).parse(:a)).to eq(/(?:a{3,}|b{,2})a/)
+      expect(
+        expr
+          .at_least(3, :a)
+          .or.at_most(2, :b)
+          .parse(:a)
+          .parse(:b)
+          .or(:c)
+          .or(:d, :efg)
+      ).to eq(/(?:a{3,}|b{,2})a(?:b|c|efg|d)/)
+    end
   end
 end
