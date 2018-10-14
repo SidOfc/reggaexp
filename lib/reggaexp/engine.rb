@@ -4,22 +4,25 @@
 module Reggaexp
   # Reggaexp::Engine
   class Engine
-    attr_reader :clauses
+    attr_reader :clauses, :flags
 
     # characters that need to be escaped outside and within a
     # character-class respectively.
     ESCAPE                 = %w[{ } ( ) [ ] | ? * + . ^ $ \\].freeze
     CHARACTER_CLASS_ESCAPE = %w{- ]}.freeze
     PRESETS                = {
-      word:     '\w',
-      number:   0..9,
-      letter:   'a'..'Z',
-      upper:    'A'..'Z',
-      lower:    'a'..'z',
-      dot:      '.',
-      blank:    [' ', '\t'],
-      hex:      [:number, 'a'..'F'],
-      alphanum: %i[letter number]
+      word:       '\w',
+      number:     0..9,
+      letter:     'a'..'Z',
+      upper:      'A'..'Z',
+      lower:      'a'..'z',
+      whitespace: '\s',
+      space:      ' ',
+      tab:        '\t',
+      dot:        '.',
+      blank:      %i[space tab],
+      hex:        [:number, 'a'..'F'],
+      alphanum:   %i[letter number]
     }.freeze
 
     PRESET_ALIASSES = {
@@ -35,6 +38,7 @@ module Reggaexp
       @clause_opts = []
       @clauses     = []
       @flags       = []
+      @pattern     = nil
       @block       = block if block_given?
 
       instance_eval(&@block) if @block
@@ -44,6 +48,7 @@ module Reggaexp
       @clause_opts = []
       @clauses     = []
       @flags       = []
+      @pattern     = nil
 
       instance_eval(&@block) if @block
 
@@ -52,18 +57,27 @@ module Reggaexp
 
     # set flags of regular expression
     def add_flags(*flag_args)
-      @flags = (@flags + flag_args).uniq
+      @pattern = nil
+      @flags   = (@flags + flag_args).uniq
 
       self
     end
     alias add_flag add_flags
 
     def remove_flags(*flag_args)
-      @flags -= flag_args
+      @pattern  = nil
+      @flags   -= flag_args
 
       self
     end
     alias remove_flag remove_flags
+
+    def clear_flags!
+      @pattern = nil
+      @flags   = []
+
+      self
+    end
 
     # parses arguments given to any function like #one_or_more or #between
     # and processes it to produce the right clauses.
@@ -74,18 +88,25 @@ module Reggaexp
     # we can do this because it will not matter for the regular expression
     # and we get an added benefit of simplifying a lot of comparisons since
     # we don't have to worry about 4 == '4' when deduplicating for example.
-    def parse(*args, **opts)
+    def parse(*args, **opts, &block)
+      @pattern = nil
+      return parse_block(**opts, &block) if block_given?
+
       flat_args = args.flatten
       flat_args = with_presets flat_args
       atoms     = [*ranges(flat_args),
                    *numerics(flat_args),
                    *strings(flat_args),
                    *symbols(flat_args),
-                   *bools(flat_args)]
+                   *bools(flat_args)].uniq
 
-      append_clause atoms, opts.merge(clause: clauses.size)
-
+      append_clause atoms, opts
       self
+    end
+
+    def parse_block(**opts, &block)
+      sub_pattern = self.class.new(&block)
+      append_clause sub_pattern.parse, opts
     end
 
     # filter elements for a character class
@@ -199,7 +220,7 @@ module Reggaexp
 
     # build the actual pattern
     def pattern
-      Regexp.compile compiled_pattern, flag_value
+      @pattern ||= Regexp.compile compiled_pattern, flag_value
     end
 
     def compiled_pattern
@@ -370,18 +391,26 @@ module Reggaexp
     # converts ranges to correct min-max format and puts
     # all single chars in one character class
     def exprs_from_atoms(atoms)
+      return sub_expr atoms if atoms.is_a? self.class
+
       atoms = atoms_after_flags atoms
       chars = character_class atoms
       chars = chars.map { |c| c.is_a?(Range) ? range_bounds(c).join('-') : c }
       strs  = non_capturing_group atoms
 
       if chars.size == 1 && chars.first.tr('\\', '').match(/\A.\z/)
-        strs << chars.first
+        # char = ESCAPE.include?(chars.first) ? chars.first.tr('\\', '') : chars.first
+        strs << escape(chars.first)
       elsif chars.any?
         strs << "[#{chars.join}]"
       end
 
       strs
+    end
+
+    def sub_expr(reggaexp)
+      pat = reggaexp.clear_flags!.add_flags(*flags).pattern
+      [pat.inspect[1..-(reggaexp.flags.length + 2)]]
     end
 
     # apply flags to atoms and remove duplicates
@@ -404,7 +433,7 @@ module Reggaexp
 
     # append an clause to the end of the pattern and return self.
     def append_clause(content, opts)
-      @clause_opts << opts
+      @clause_opts << opts.merge(clause: @clauses.size)
       @clauses     << content
 
       self
@@ -453,11 +482,15 @@ module Reggaexp
 
     # check wether given range has numeric boundaries
     def numeric_range?(range)
+      return false unless range.respond_to?(:first) && range.respond_to?(:last)
+
       range.first =~ /\A\d\z/ && range.last =~ /\A\d\z/ ? true : false
     end
 
     # check wether given range has character boundaries
     def character_range?(range)
+      return false unless range.respond_to?(:first) && range.respond_to?(:last)
+
       range.first =~ /\A\D\z/ && range.last =~ /\A\D\z/ ? true : false
     end
 
@@ -471,7 +504,7 @@ module Reggaexp
     # context. see #character_class_escape to escape characters
     # inside a character-class-context
     def escape(input)
-      input.to_s.chars.map do |c|
+      input.to_s.split(/(?=\\)|(?<!\\)/).map do |c|
         ESCAPE.include?(c) ? "\\#{c}" : c
       end.join
     end
@@ -480,7 +513,7 @@ module Reggaexp
     # a character-class only requires few characters to
     # be escaped like '-' and ']' unlike regular escape.
     def character_class_escape(input)
-      input.to_s.chars.map do |c|
+      input.to_s.split(/(?=\\)|(?<!\\)/).map do |c|
         CHARACTER_CLASS_ESCAPE.include?(c) ? "\\#{c}" : c
       end.join
     end

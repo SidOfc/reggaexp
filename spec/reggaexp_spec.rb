@@ -1,350 +1,465 @@
+# examples may contain some non-related tokens to the test
+# to ensure that everything is joined properly regardless
+# of argument order.
+
 RSpec.describe Reggaexp do
+  def builder
+    Reggaexp::Expression.new
+  end
+
+  def with_flags(*flags)
+    builder.add_flags(*flags)
+  end
+
+  def clause(*args, **opts)
+    builder.find(*args, **opts).clauses.flatten
+  end
+
+  def pattern(*args, **opts)
+    builder.find(*args, **opts)
+  end
+
+  def character_class(*args)
+    builder.character_class clause(*args)
+  end
+
+  def non_capturing_group(*args)
+    builder.non_capturing_group clause(*args)
+  end
+
   context Reggaexp::Engine do
-    context '#map_patterns' do
-      let!(:builder) { Reggaexp::BaseExpression.new }
-
-      it 'maps :digit and :digits to [0-9]' do
-        expect(builder.map_patterns(:digit)).to  include '0-9'
-        expect(builder.map_patterns(:digits)).to include '0-9'
+    context 'Argument parsing' do
+      context 'Block' do
+        it 'creates a sub-expression' do
+          expect(builder.find { one_or_more(:a).or(:abc) }.then(:q)).to eq(/(?:a+|abc)q/)
+        end
       end
 
-      it 'maps :letter and :letters to [a-zA-Z]' do
-        expect(builder.map_patterns(:letter)).to  include 'a-z', 'A-Z'
-        expect(builder.map_patterns(:letters)).to include 'a-z', 'A-Z'
+      context 'Symbols' do
+        it 'maps symbols to presets' do
+          expect(clause(:word, :number, :letter)).to(
+            contain_exactly('\w', '0'..'9', 'a'..'z', 'A'..'Z')
+          )
+        end
+
+        it 'recognizes plural presets' do
+          expect(clause(:words, :numbers, :letters)).to(
+            contain_exactly('\w', '0'..'9', 'a'..'z', 'A'..'Z')
+          )
+        end
+
+        it 'maps nested presets' do
+          expect(clause(:alphanum)).to(
+            contain_exactly('0'..'9', 'a'..'z', 'A'..'Z')
+          )
+        end
+
+        it 'supports aliases' do
+          expect(clause(:digits)).to     eq clause(:numbers)
+          expect(clause(:chars)).to      eq clause(:letters)
+          expect(clause(:characters)).to eq clause(:letters)
+        end
       end
 
-      it 'maps :uppercase_letter and :uppercase_letters to [A-Z]' do
-        expect(builder.map_patterns(:uppercase_letter)).to  include 'A-Z'
-        expect(builder.map_patterns(:uppercase_letters)).to include 'A-Z'
+      context 'Bools' do
+        it 'stringifies true' do
+          expect(clause(true)).to  contain_exactly 'true'
+        end
+
+        it 'stringifies false' do
+          expect(clause(false)).to contain_exactly 'false'
+        end
       end
 
-      it 'maps :lowercase_letter and :lowercase_letters to [a-z]' do
-        expect(builder.map_patterns(:lowercase_letter)).to  include 'a-z'
-        expect(builder.map_patterns(:lowercase_letters)).to include 'a-z'
+      context 'Ranges' do
+        it 'converts range boundary types to strings' do
+          expect(clause(1..4, :b..:q, 's'..'u')).to(
+            contain_exactly('1'..'4', 'b'..'q', 's'..'u')
+          )
+        end
+
+        it 'removes redundant character ranges' do
+          expect(clause(:a..:z, :e..:i)).to contain_exactly 'a'..'z'
+          expect(clause(:a..:z, :a..:z)).to contain_exactly 'a'..'z'
+          expect(clause(:a..:d, :f..:i)).to contain_exactly 'a'..'d', 'f'..'i'
+        end
+
+        it 'merges connecting character ranges' do
+          expect(clause(:a..:d, :e..:i)).to contain_exactly 'a'..'i'
+          expect(clause(:a..:d, :f..:i)).to contain_exactly 'a'..'d', 'f'..'i'
+        end
+
+        it 'removes redundant numeric ranges' do
+          expect(clause(0..9, 3..6)).to contain_exactly '0'..'9'
+          expect(clause(0..9, 0..9)).to contain_exactly '0'..'9'
+          expect(clause(0..2, 4..6)).to contain_exactly '0'..'2', '4'..'6'
+        end
+
+        it 'merges connecting numeric ranges' do
+          expect(clause(0..3, 4..7)).to contain_exactly '0'..'7'
+          expect(clause(0..3, 5..7)).to contain_exactly '0'..'3', '5'..'7'
+        end
+
+        it 'explodes ranges with different case bounds' do
+          expect(clause('a'..'Z')).to contain_exactly 'a'..'z', 'A'..'Z'
+        end
       end
 
-      it 'maps :space and :spaces to [ ]' do
-        expect(builder.map_patterns(:space)).to  include ' '
-        expect(builder.map_patterns(:spaces)).to include ' '
+      context 'Numbers and floats' do
+        it 'converts numbers and floats to strings' do
+          expect(clause('1', 2, 3.25)).to contain_exactly '1', '2', '3\\.25'
+        end
+
+        it 'removes duplicates' do
+          expect(clause('1', 2, 3, 1, 5, 1)).to contain_exactly '1', '2', '3', '5'
+          expect(clause('1.25', 1, 1.25)).to    contain_exactly '1\\.25', '1'
+        end
       end
 
-      it 'maps :whitespace and :whitespaces to \s' do
-        expect(builder.map_patterns(:whitespace)).to  include '\s'
-        expect(builder.map_patterns(:whitespaces)).to include '\s'
-      end
+      context 'Strings' do
+        it 'escapes strings for use in a character-class' do
+          expect(clause('$', 'h.')).to contain_exactly 'h\.', '$'
+        end
 
-      it 'maps :non_whitespace and :non_whitespaces to \s' do
-        expect(builder.map_patterns(:non_whitespace)).to  include '\S'
-        expect(builder.map_patterns(:non_whitespaces)).to include '\S'
-      end
+        it 'escapes strings for use outside of a character-class' do
+          expect(clause('the^e', 'by$')).to contain_exactly 'the\\^e', 'by\\$'
+        end
 
-
-      it 'maps :tab and :tabs to \t' do
-        expect(builder.map_patterns(:tab)).to  include '\t'
-        expect(builder.map_patterns(:tabs)).to include '\t'
-      end
-
-      it 'maps :word_character and :word_characters to \w' do
-        expect(builder.map_patterns(:word_character)).to  include '\w'
-        expect(builder.map_patterns(:word_characters)).to include '\w'
-      end
-
-      it 'maps :non_word_character and :non_word_characters to \W' do
-        expect(builder.map_patterns(:non_word_character)).to  include '\W'
-        expect(builder.map_patterns(:non_word_characters)).to include '\W'
-      end
-
-      it 'maps :alphanumeric to [a-zA-Z0-9]' do
-        expect(builder.map_patterns(:alphanumeric)).to(
-          include('a-z', 'A-Z', '0-9')
-        )
-      end
-
-      it 'maps :uppercase_alphanumeric to [a-zA-Z0-9]' do
-        expect(builder.map_patterns(:uppercase_alphanumeric)).not_to(
-          include('a-z')
-        )
-      end
-
-      it 'maps :lowercase_alphanumeric to [a-zA-Z0-9]' do
-        expect(builder.map_patterns(:lowercase_alphanumeric)).not_to(
-          include('A-Z')
-        )
+        it 'removes duplicates' do
+          expect(clause('a', 'b', 'c', 'b', 'a')).to contain_exactly 'a', 'b', 'c'
+          expect(clause('abc', 'def', 'abc', 'ghi')).to(
+            contain_exactly('abc', 'def', 'ghi')
+          )
+        end
       end
     end
 
-    context '#escape' do
-      let!(:pattern) { Reggaexp.start_with '$|^*+.[({})]' }
+    context 'Expression components' do
+      context 'Start and end of line / string' do
+        it 'creates a pattern matching the start of a line' do
+          expect(pattern('abc', prepend: '^')).to match 'abc'
+          expect(pattern('abc', prepend: '^')).not_to match 'xabc'
+        end
 
-      it 'escapes special characters' do
-        expect(pattern).to eq(/^\$\|\^\*\+\.\[\(\{\}\)\]/)
-        expect(pattern =~ '$|^*+.[({})]').to be_truthy
+        it 'creates a pattern matching the start of a string' do
+          expect(pattern('abc', prepend: '\A')).to match "abc"
+          expect(pattern('abc', prepend: '\A')).not_to match "\nabc"
+        end
+
+        it 'creates a pattern matching the end of a line' do
+          expect(pattern('abc', append: '$')).to match "abc"
+          expect(pattern('abc', append: '$')).not_to match "abcx"
+        end
+
+        it 'creates a pattern matching the end of a string' do
+          expect(pattern('abc', append: '\z')).to match "abc"
+          expect(pattern('abc', append: '\z')).not_to match "abc\n"
+        end
+      end
+
+      context 'Character classes' do
+        it 'filters single-character strings for character-class usage' do
+          expect(character_class('a', 'abc', 'q', 1, :b)).to(
+            contain_exactly('a', 'q', '1', 'b')
+          )
+        end
+
+        it 'creates a character class with single-length strings and ranges' do
+          expect(pattern(:q, :a..:f)).to eq(/[qa-f]/)
+        end
+
+        it 'only generates a character class when needed' do
+          expect(pattern(:q)).to eq(/q/)
+        end
+      end
+
+      context 'Capture groups and non capture groups' do
+        it 'filters multi-character strings for non-capture-group usage' do
+          expect(non_capturing_group('a', 'abc', 'q', 123, :b)).to(
+            contain_exactly('123', 'abc')
+          )
+        end
+
+        it 'creates a capture group when capture: true is given' do
+          match_data = pattern('hello', capture: true).match('hello')
+          expect(match_data[1]).to eq 'hello'
+        end
+
+        it 'does not create a capture group when capture: false' do
+          match_data = pattern('hello', capture: false).match('hello')
+          expect(match_data[1]).to be_nil
+        end
+
+        it 'creates a named capture group when as: :name is given' do
+          match_data = pattern('hello', as: :name).match('hello')
+          expect(match_data[:name]).to eq 'hello'
+        end
+
+        it 'creates a non-capturing group around strings when not capturing' do
+          expect(pattern('hello', 'goodbye')).to eq(/(?:hello|goodbye)/)
+        end
+      end
+
+      context 'Quantifiers' do
+        it 'applies "one_or_more"' do
+          expect(pattern('a', quantifier: '+')).to eq(/a+/)
+        end
+
+        it 'applies "zero_or_more"' do
+          expect(pattern('a', quantifier: '*')).to eq(/a*/)
+        end
+
+        it 'applies "optional"' do
+          expect(pattern('a', quantifier: '?')).to eq(/a?/)
+        end
+
+        it 'applies "between"' do
+          expect(pattern('a', quantifier: 1..3)).to   eq(/a{1,3}/)
+          expect(pattern('a', quantifier: [1, 3])).to eq(/a{1,3}/)
+        end
+
+        it 'does not apply redundant quantifier' do
+          expect(pattern('a', quantifier: [1])).to eq(/a/)
+          expect(pattern('a', quantifier: [1, 1])).to eq(/a/)
+        end
+
+        it 'simplifies between(1, inf) to "+"' do
+          expect(pattern('a', quantifier: [1, nil])).to eq(/a+/)
+        end
+
+        it 'simplifies between(0, inf) to "*"' do
+          expect(pattern('a', quantifier: [0, nil])).to eq(/a*/)
+        end
+
+        it 'simplifies between(0, 1) to "?"' do
+          expect(pattern('a', quantifier: [0, 1])).to eq(/a?/)
+        end
+      end
+
+      context 'Regular expression flags' do
+        context 'Simplifies clauses' do
+          it 'downcases all uppercase groups with case-insensitive flag' do
+            expect(with_flags(:i).find(:a..:d, :X..:Z)).to eq(/[x-za-d]/i)
+          end
+
+          it 'removes duplicate ranges with case-insensitive flag' do
+            expect(with_flags(:i).find(:a..:z, :A..:Z)).to eq(/[a-z]/i)
+          end
+        end
+
+        context 'Multiple flags' do
+          let!(:pattern) { Reggaexp.multi_line.case_insensitive.whitespace_insensitive }
+
+          it 'can handle multiple flags' do
+            expect(pattern).to eq(//mix)
+          end
+
+          it 'removes the correct flag when multiple are present' do
+            expect(pattern.case_sensitive).to eq(//mx)
+          end
+
+          it 'does not add duplicate flags' do
+            expect(pattern.case_insensitive).to eq(//mix)
+          end
+        end
+
+        context 'Adding flags' do
+          context '#case_insensitive' do
+            let!(:pattern) { Reggaexp.case_insensitive }
+
+            it 'adds a flag to the regular expression' do
+              expect(pattern).to eq(//i)
+            end
+          end
+
+          context '#whitespace_insensitive' do
+            let!(:pattern) { Reggaexp.whitespace_insensitive }
+
+            it 'adds a flag to the regular expression' do
+              expect(pattern).to eq(//x)
+            end
+          end
+
+          context '#multi_line' do
+            let!(:pattern) { Reggaexp.multi_line }
+
+            it 'adds a flag to the regular expression' do
+              expect(pattern).to eq(//m)
+            end
+          end
+        end
+
+        context 'Removing flags' do
+          context '#case_sensitive' do
+            let!(:pattern) { Reggaexp.case_insensitive }
+
+            it 'removes a flag to the regular expression' do
+              expect(pattern).to eq(//i)
+              expect(pattern.case_sensitive).to eq(//)
+            end
+          end
+
+          context '#whitespace_sensitive' do
+            let!(:pattern) { Reggaexp.whitespace_insensitive }
+
+            it 'removes a flag to the regular expression' do
+              expect(pattern).to eq(//x)
+              expect(pattern.whitespace_sensitive).to eq(//)
+            end
+          end
+
+          context '#single_line' do
+            let!(:pattern) { Reggaexp.multi_line }
+
+            it 'removes a flag to the regular expression' do
+              expect(pattern).to eq(//m)
+              expect(pattern.single_line).to eq(//)
+            end
+          end
+        end
+      end
+
+      context 'Escaping' do
+        it 'escapes special characters outside character classes' do
+          expect(pattern('$|^*+.[({})]') =~ '$|^*+.[({})]').to be_truthy
+        end
+
+        it 'escapes special characters inside character classes' do
+          expect(pattern('$', ']', '-', :a..:f)).to eq(/[$\]\-a-f]/)
+        end
       end
     end
 
-    context '#simplify' do
-      let!(:pattern_zero_or_more) { Reggaexp.start_with [0, nil], :letter }
-      let!(:pattern_one_or_more)  { Reggaexp.start_with [1, nil], :letter }
-      let!(:pattern_zero_or_one)  { Reggaexp.start_with [0, 1],   :letter }
-
-      it 'simplifies zero or more longhand "{0,}" to shorthand "*"' do
-        expect(pattern_zero_or_more).to eq(/^[a-zA-Z]*/)
+    context 'Mimicks Regexp' do
+      it 'responds to #match' do
+        expect(pattern).to respond_to :match
       end
 
-      it 'simplifies one or more longhand "{1,}" to shorthand "+"' do
-        expect(pattern_one_or_more).to eq(/^[a-zA-Z]+/)
+      it 'responds to #match?' do
+        expect(pattern).to respond_to :match?
       end
 
-      it 'simplifies zero or one longhand "{0,1}" to shorthand "?"' do
-        expect(pattern_zero_or_one).to eq(/^[a-zA-Z]?/)
+      it 'responds to #!~' do
+        expect(pattern).to respond_to :!~
       end
 
-      it 'completely removes zero longhand "{0}"' do
-        expect(pattern_zero_or_one).to eq(/^[a-zA-Z]?/)
+      it 'responds to #=~' do
+        expect(pattern).to respond_to :=~
+      end
+
+      it 'responds to #===' do
+        expect(pattern).to respond_to :===
+      end
+
+      it 'responds to #==' do
+        expect(pattern).to respond_to :==
+      end
+
+      it 'responds to #!=' do
+        expect(pattern).to respond_to :!=
+      end
+
+      it 'responds to #<=>' do
+        expect(pattern).to respond_to :<=>
+      end
+
+      it 'responds to #~' do
+        expect(pattern).to respond_to :<=>
+      end
+
+      it 'responds to #source' do
+        expect(pattern).to respond_to :source
+      end
+
+      it 'responds to #options' do
+        expect(pattern).to respond_to :options
+      end
+
+      it 'responds to #named_captures' do
+        expect(pattern).to respond_to :named_captures
+      end
+
+      it 'responds to #names' do
+        expect(pattern).to respond_to :names
+      end
+
+      it 'responds to #to_s' do
+        expect(pattern).to respond_to :to_s
+      end
+
+      it 'does not respond to #to_a' do
+        expect(pattern).not_to respond_to :to_a
       end
     end
   end
 
-  context 'Dedeuplicating patterns' do
-    context 'Numbers' do
-      it 'adds them correctly in separate calls' do
-        expect(Reggaexp.find(:digit).find('0', '8').find('2')).to eq(/[0-9][08]2/)
-      end
-
-      it 'do not get added when already present in a range' do
-        expect(Reggaexp.find(:digit, 0, '8', '2')).to eq(/[0-9]/)
-      end
-
-      it 'do not get added when already present individually' do
-        expect(Reggaexp.find('8', '8')).to eq(/8/)
-      end
-
-      it 'excludes a range that is a sub-range of another range' do
-        expect(Reggaexp.find(1..8, 2..4)).to eq(/[1-8]/)
-      end
-
-      it 'excludes ranges and characters at the same time' do
-        expect(Reggaexp.find(1..8, 2..4, '4', '6')).to eq(/[1-8]/)
+  context Reggaexp::Expression do
+    context '#start_of_line' do
+      it 'creates a pattern matching at start of line' do
+        expect(builder.start_of_line).to eq(/^/)
+        expect(builder.start_of_line(:a..:z)).to eq(/^[a-z]/)
       end
     end
 
-    context 'Strings' do
-      it 'adds them correctly in separate calls' do
-        expect(Reggaexp.find(:letter).find(:letter)).to eq(/[a-zA-Z][a-zA-Z]/)
-      end
-
-      it 'do not get added when already present in a range and subject size is 1' do
-        expect(Reggaexp.find(:letter, 'a', 'c', 'Z')).to eq(/[a-zA-Z]/)
-      end
-
-      it 'do not get added when present individually' do
-        expect(Reggaexp.find('a', 'a')).to eq(/a/)
-      end
-
-      it 'excludes a range that is a sub-range of another range' do
-        expect(Reggaexp.find('a'..'f', 'a'..'z')).to eq(/[a-z]/)
-      end
-
-      it 'exclues ranges and characters at the same time' do
-        expect(Reggaexp.find('a'..'f', 'a'..'x', 'z')).to eq(/[a-xz]/)
-      end
-    end
-  end
-
-  context 'Regular expression flags' do
-    context 'Multiple flags' do
-      let!(:pattern) { Reggaexp.multi_line.case_insensitive.whitespace_insensitive }
-
-      it 'can handle multiple flags' do
-        expect(pattern).to eq(//mix)
-      end
-
-      it 'removes the correct flag when multiple are present' do
-        expect(pattern.case_sensitive).to eq(//mx)
-      end
-
-      it 'does not add duplicate flags' do
-        expect(pattern.case_insensitive).to eq(//mix)
+    context '#start_of_string' do
+      it 'creates a pattern matching at start of string' do
+        expect(builder.start_of_string).to eq(/\A/)
+        expect(builder.start_of_string(:a..:z)).to eq(/\A[a-z]/)
       end
     end
 
-    context 'Adding flags' do
-      context '#case_insensitive' do
-        let!(:pattern) { Reggaexp.case_insensitive }
-
-        it 'adds a flag to the regular expression' do
-          expect(pattern).to eq(//i)
-        end
-      end
-
-      context '#whitespace_insensitive' do
-        let!(:pattern) { Reggaexp.whitespace_insensitive }
-
-        it 'adds a flag to the regular expression' do
-          expect(pattern).to eq(//x)
-        end
-      end
-
-      context '#multi_line' do
-        let!(:pattern) { Reggaexp.multi_line }
-
-        it 'adds a flag to the regular expression' do
-          expect(pattern).to eq(//m)
-        end
+    context '#end_of_line' do
+      it 'creates a pattern matching at end of line' do
+        expect(builder.end_of_line).to eq(/$/)
+        expect(builder.end_of_line(:a..:z)).to eq(/[a-z]$/)
       end
     end
 
-    context 'Removing flags' do
-      context '#case_sensitive' do
-        let!(:pattern) { Reggaexp.case_insensitive }
-
-        it 'removes a flag to the regular expression' do
-          expect(pattern).to eq(//i)
-          expect(pattern.case_sensitive).to eq(//)
-        end
-      end
-
-      context '#whitespace_sensitive' do
-        let!(:pattern) { Reggaexp.whitespace_insensitive }
-
-        it 'removes a flag to the regular expression' do
-          expect(pattern).to eq(//x)
-          expect(pattern.whitespace_sensitive).to eq(//)
-        end
-      end
-
-      context '#single_line' do
-        let!(:pattern) { Reggaexp.multi_line }
-
-        it 'removes a flag to the regular expression' do
-          expect(pattern).to eq(//m)
-          expect(pattern.single_line).to eq(//)
-        end
-      end
-    end
-  end
-
-  context 'Regular expression clauses' do
-    context '#start_with' do
-      let!(:pattern) { Reggaexp.start_with 'h' }
-
-      it 'always prepends "^"' do
-        expect(Reggaexp.start_with).to eq(/^/)
-      end
-
-      it 'matches a character at the start of a line' do
-        expect(pattern =~ 'hello').to be_truthy
+    context '#end_of_string' do
+      it 'creates a pattern matching at end of string' do
+        expect(builder.end_of_string).to eq(/\z/)
+        expect(builder.end_of_string(:a..:z)).to eq(/[a-z]\z/)
       end
     end
 
-    context '#string_start_with' do
-      let!(:pattern) { Reggaexp.string_start_with 'Q' }
-
-      it 'always prepends "\\A"' do
-        expect(Reggaexp.string_start_with).to eq(/\A/)
-      end
-
-      it 'matches only at the start of a string' do
-        expect(pattern =~ "Q\nHello").to be_truthy
-        expect(pattern =~ "\nQHello").to be_falsy
-      end
-    end
-
-    context '#end_with' do
-      let!(:pattern) { Reggaexp.end_with 'o' }
-
-      it 'always appends "$"' do
-        expect(Reggaexp.end_with).to eq(/$/)
-      end
-
-      it 'matches a character at the end of a line' do
-        expect(pattern =~ 'hello').to be_truthy
-      end
-    end
-
-    context '#string_end_with' do
-      let!(:pattern) { Reggaexp.string_end_with 'o' }
-
-      it 'always appends "\\z"' do
-        expect(Reggaexp.string_end_with).to eq(/\z/)
-      end
-
-      it 'matches only at the end of a string' do
-        expect(pattern =~ "Hel\nlo").to be_truthy
-        expect(pattern =~ "Hello\n").to be_falsy
-      end
-    end
-
-    context '#at_least' do
-      let!(:pattern) { Reggaexp.start_of_line.at_least(2, 'l').end_of_line }
-
-      it 'matches at least [N] amount of characters' do
-        expect(pattern =~ 'l').to   be_falsy
-        expect(pattern =~ 'lll').to be_truthy
-      end
-    end
-
-    context '#at_most' do
-      let!(:pattern) { Reggaexp.start_of_line.at_most(2, 'l').end_of_line }
-
-      it 'matches at most [N] amount of characters' do
-        expect(pattern =~ 'll').to  be_truthy
-        expect(pattern =~ 'lll').to be_falsy
-      end
-    end
-
-    context '#one_or_more' do
-      let!(:pattern) { Reggaexp.start_of_line.one_or_more(:letter).end_of_line }
-
-      it 'matches at least one of given atom' do
-        expect(pattern =~ '').to    be_falsy
-        expect(pattern =~ 'a').to   be_truthy
-        expect(pattern =~ 'aaa').to be_truthy
+    context '#zero_or_one' do
+      it 'creates a pattern matching zero or one occurence' do
+        expect(builder.zero_or_one(:a)).to eq(/a?/)
       end
     end
 
     context '#zero_or_more' do
-      let!(:pattern) { Reggaexp.start_of_line.zero_or_more(:letter).end_of_line }
-
-      it 'matches at least one of given atom' do
-        expect(pattern =~ '').to    be_truthy
-        expect(pattern =~ 'a').to   be_truthy
-        expect(pattern =~ 'aaa').to be_truthy
+      it 'creates a pattern matching zero or more occurences' do
+        expect(builder.zero_or_more(:a)).to eq(/a*/)
       end
     end
 
-    context '#one_of' do
-      let!(:pattern) { Reggaexp.start_of_line.one_of('dear', 'best').then(',') }
-
-      it 'matches one of given patterns' do
-        expect(pattern =~ 'dear,').to be_truthy
-        expect(pattern =~ 'best,').to be_truthy
-        expect(pattern =~ 'noob,').to be_falsy
+    context '#one_or_more' do
+      it 'creates a pattern matching one or more occurences' do
+        expect(builder.one_or_more(:a)).to eq(/a+/)
       end
     end
 
-    context '#or' do
-      let!(:pattern) { Reggaexp.start_of_line(:whitespace).or { end_of_line(:whitespace) } }
-
-      it 'generates an or clause' do
-        expect(pattern).to eq(/^\s|\s$/)
-        expect(pattern =~ ' a').to be_truthy
-        expect(pattern =~ 'a ').to be_truthy
-        expect(pattern =~ 'aa').to be_falsy
+    context '#between' do
+      it 'creates a pattern matching between [min] and [max] occurences' do
+        expect(builder.between(1..4, :a)).to eq(/a{1,4}/)
       end
     end
 
-    context '#not' do
-      let!(:pattern) { Reggaexp.start_of_line.not(2, :digits) }
+    context '#at_most' do
+      it 'creates a pattern matching at most [amount] occurences' do
+        expect(builder.at_most(3, :a)).to eq(/a{,3}/)
+      end
+    end
 
-      it 'does not match when found' do
-        expect(pattern =~ '12hello').to be_falsy
-        expect(pattern =~ 'hello').to   be_truthy
+    context '#at_least' do
+      it 'creates a pattern matching at least [amount] occurences' do
+        expect(builder.at_least(3, :a)).to eq(/a{3,}/)
       end
     end
 
     context '#not_preceded_by' do
-      let!(:pattern) { Reggaexp.line_start_with(1, :digit).not_preceded_by(0) }
+      let!(:pattern) { Reggaexp.start_of_line(1, :digit).not_preceded_by(0) }
 
       it 'does not match when preceded by found' do
         expect(pattern =~ '123').to be_truthy
@@ -353,7 +468,7 @@ RSpec.describe Reggaexp do
     end
 
     context '#preceded_by' do
-      let!(:pattern) { Reggaexp.line_start_with(1, :digit).preceded_by(0) }
+      let!(:pattern) { Reggaexp.start_of_line(1, :digit).preceded_by(0) }
 
       it 'matches when preceded by found' do
         expect(pattern =~ '123').to be_falsy
@@ -361,24 +476,25 @@ RSpec.describe Reggaexp do
       end
     end
 
-    context '#capture' do
-      let!(:unnamed) { Reggaexp.start_of_line.capture(1, :letter) }
-      let!(:named)   { Reggaexp.start_of_line.capture(1, :letter, as: :first_char) }
-
-      it 'captures a match' do
-        expect(unnamed.match('abc')[1]).to eq 'a'
+    context '#or' do
+      it 'creates a simple pattern using or' do
+        expect(builder.at_least(3, :a).or.at_most(2, :b).then(:a)).to eq(/(?:a{3,}|b{,2})a/)
       end
 
-      it 'creates a named capturing group when :as option is used' do
-        expect(named.match('abc')[:first_char]).to eq 'a'
+      it 'does not create a non capture group if not needed' do
+        expect(builder.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
       end
-    end
 
-    context '#group' do
-      let!(:pattern) { Reggaexp.group { find(:letters, :digits).or { find([1, 4], :whitespace) } } }
-
-      it 'creates a non capturing group' do
-        expect(pattern).to eq(/(?:[a-zA-Z0-9]|\s{1,4})/)
+      it 'groups multiple or clauses' do
+        expect(
+          builder
+            .at_least(3, :a)
+            .or.at_most(2, :b)
+            .then(:a)
+            .then(:b)
+            .or(:c)
+            .or(:d, :efg)
+        ).to eq(/(?:a{3,}|b{,2})a(?:b|c|efg|d)/)
       end
     end
   end
@@ -387,31 +503,28 @@ RSpec.describe Reggaexp do
     context 'Email address' do
       let!(:pattern) do
         Reggaexp
-        .string_start_with(:word_character, '"')
-        .zero_or_more(:word_character, '-', '.', '+', '"')
-        .then(:word_character, '"')
-        .then('@')
-        .group {
-          find(:alphanumeric)
-            .one_or_more(:alphanumeric, '-')
-            .group { find('.').one_or_more(:letter, '-') }
-            .zero_or_more
-            .then('.')
-            .one_or_more(:letter)
-            .or {
-              group {
-                find(3, :digits).then('.')
-              }
-              .repeat(3)
-              .then(3, :digits)
-            }
-        }
-        .end_of_string
-        .case_insensitive
+          .start_of_string(:word, '"')
+          .zero_or_more(:word, *%w[- . + "])
+          .then(:word, '"')
+          .then('@')
+          .then {
+            find(:alphanum)
+              .one_or_more(:alphanum, '-')
+              .group { find('.').one_or_more(:letter, '-') }.zero_or_more
+              .then('.')
+              .one_or_more(:letter)
+          }
+          .or {
+            group { find(3, :digits).then('.') }
+              .find(3)
+              .find(3, :digits)
+          }
+          .end_of_string
       end
 
       it 'can handle an email address regex' do
-        expect(pattern).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[a-zA-Z0-9][a-zA-Z0-9\-]+(?:\.[a-zA-Z\-]+)*\.[a-zA-Z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/i)
+        expect(pattern).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9A-Za-z][\-0-9A-Za-z]+(?:\.[\-A-Za-z]+)*\.[A-Za-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/)
+        expect(pattern.add_flag(:i)).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9a-z][\-0-9a-z]+(?:\.[\-a-z]+)*\.[a-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/i)
       end
 
       it 'identifies invalid email formats' do
