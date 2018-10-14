@@ -327,62 +327,90 @@ RSpec.describe Reggaexp do
   end
 
   context Reggaexp::Expression do
-    it '#start_of_line' do
-      expect(expr.start_of_line).to eq(/^/)
-      expect(expr.start_of_line(:a..:z)).to eq(/^[a-z]/)
+    context '#start_of_line' do
+      it 'creates a pattern matching at start of line' do
+        expect(expr.start_of_line).to eq(/^/)
+        expect(expr.start_of_line(:a..:z)).to eq(/^[a-z]/)
+      end
     end
 
-    it '#start_of_string' do
-      expect(expr.start_of_string).to eq(/\A/)
-      expect(expr.start_of_string(:a..:z)).to eq(/\A[a-z]/)
+    context '#start_of_string' do
+      it 'creates a pattern matching at start of string' do
+        expect(expr.start_of_string).to eq(/\A/)
+        expect(expr.start_of_string(:a..:z)).to eq(/\A[a-z]/)
+      end
     end
 
-    it '#end_of_line' do
-      expect(expr.end_of_line).to eq(/$/)
-      expect(expr.end_of_line(:a..:z)).to eq(/[a-z]$/)
+    context '#end_of_line' do
+      it 'creates a pattern matching at end of line' do
+        expect(expr.end_of_line).to eq(/$/)
+        expect(expr.end_of_line(:a..:z)).to eq(/[a-z]$/)
+      end
     end
 
-    it '#end_of_string' do
-      expect(expr.end_of_string).to eq(/\z/)
-      expect(expr.end_of_string(:a..:z)).to eq(/[a-z]\z/)
+    context '#end_of_string' do
+      it 'creates a pattern matching at end of string' do
+        expect(expr.end_of_string).to eq(/\z/)
+        expect(expr.end_of_string(:a..:z)).to eq(/[a-z]\z/)
+      end
     end
 
-    it '#zero_or_one' do
-      expect(expr.zero_or_one(:a)).to eq(/a?/)
+    context '#zero_or_one' do
+      it 'creates a pattern matching zero or one occurence' do
+        expect(expr.zero_or_one(:a)).to eq(/a?/)
+      end
     end
 
-    it '#zero_or_more' do
-      expect(expr.zero_or_more(:a)).to eq(/a*/)
+    context '#zero_or_more' do
+      it 'creates a pattern matching zero or more occurences' do
+        expect(expr.zero_or_more(:a)).to eq(/a*/)
+      end
     end
 
-    it '#one_or_more' do
-      expect(expr.one_or_more(:a)).to eq(/a+/)
+    context '#one_or_more' do
+      it 'creates a pattern matching one or more occurences' do
+        expect(expr.one_or_more(:a)).to eq(/a+/)
+      end
     end
 
-    it '#between' do
-      expect(expr.between(1..4, :a)).to eq(/a{1,4}/)
+    context '#between' do
+      it 'creates a pattern matching between [min] and [max] occurences' do
+        expect(expr.between(1..4, :a)).to eq(/a{1,4}/)
+      end
     end
 
-    it '#at_most' do
-      expect(expr.at_most(3, :a)).to eq(/a{,3}/)
+    context '#at_most' do
+      it 'creates a pattern matching at most [amount] occurences' do
+        expect(expr.at_most(3, :a)).to eq(/a{,3}/)
+      end
     end
 
-    it '#at_least' do
-      expect(expr.at_least(3, :a)).to eq(/a{3,}/)
+    context '#at_least' do
+      it 'creates a pattern matching at least [amount] occurences' do
+        expect(expr.at_least(3, :a)).to eq(/a{3,}/)
+      end
     end
 
-    it '#or' do
-      expect(expr.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
-      expect(expr.at_least(3, :a).or.at_most(2, :b).parse(:a)).to eq(/(?:a{3,}|b{,2})a/)
-      expect(
-        expr
-          .at_least(3, :a)
-          .or.at_most(2, :b)
-          .parse(:a)
-          .parse(:b)
-          .or(:c)
-          .or(:d, :efg)
-      ).to eq(/(?:a{3,}|b{,2})a(?:b|c|efg|d)/)
+    context '#or' do
+      it 'creates a simple pattern using or' do
+        expect(expr.at_least(3, :a).or.at_most(2, :b).parse(:a)).to eq(/(?:a{3,}|b{,2})a/)
+      end
+
+      it 'does not create a non capture group if not needed' do
+        expect(expr.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
+      end
+
+      it 'groups multiple or clauses' do
+        expect(
+          expr
+            .at_least(3, :a)
+            .or.at_most(2, :b)
+            .parse(:a)
+            .parse(:b)
+            .or(:c)
+            .or(:d, :efg)
+        ).to eq(/(?:a{3,}|b{,2})a(?:b|c|efg|d)/)
+      end
     end
   end
 end

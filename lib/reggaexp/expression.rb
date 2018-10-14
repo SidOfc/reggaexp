@@ -43,5 +43,12 @@ module Reggaexp
     def at_most(amount, *args)
       parse *args, quantifier: [nil, amount]
     end
+
+    def or(*args)
+      parse or: true # or
+      parse(*args) if args.any?
+
+      self
+    end
   end
 end

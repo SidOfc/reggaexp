@@ -88,13 +88,6 @@ module Reggaexp
       self
     end
 
-    def or(*args)
-      parse or: true
-      parse *args if args.any?
-
-      self
-    end
-
     # filter elements for a character class
     def character_class(flat_args)
       flat_args.select { |a| a.is_a?(String) && a.tr('\\', '').length == 1 } +
