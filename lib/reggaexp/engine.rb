@@ -28,7 +28,7 @@ module Reggaexp
     PRESET_ALIASSES = {
       digit:     :number,
       char:      :letter,
-      character: :letter,
+      character: :letter
     }.freeze
 
     PRESET_KEYS = (PRESETS.keys + PRESET_ALIASSES.keys)
@@ -94,10 +94,8 @@ module Reggaexp
 
       flat_args = args.flatten
       flat_args = with_presets flat_args
-      atoms     = [*ranges(flat_args),
-                   *numerics(flat_args),
-                   *strings(flat_args),
-                   *symbols(flat_args),
+      atoms     = [*ranges(flat_args), *numerics(flat_args),
+                   *strings(flat_args), *symbols(flat_args),
                    *bools(flat_args)].uniq
 
       append_clause atoms, opts
@@ -224,16 +222,14 @@ module Reggaexp
     end
 
     def compiled_pattern
-      compiled = clauses.map.with_index do |atoms, idx|
+      clauses.map.with_index do |atoms, idx|
         strs = exprs_from_atoms atoms
 
         next parse_atom idx, strs.first if strs.size == 1
         next parse_atom idx, strs.join('|'), non_capture: !in_or? if strs.any?
 
         parse_atom idx, ''
-      end
-
-      compiled.join
+      end.join
     end
 
     # comparison operators
@@ -262,7 +258,9 @@ module Reggaexp
     end
 
     def ===(other)
+      # rubocop:disable Style/CaseEquality
       pattern === other
+      # rubocop:enable Style/CaseEquality
     end
 
     def <=>(other)
@@ -270,7 +268,9 @@ module Reggaexp
     end
 
     def ~
+      # rubocop:disable Style/SpecialGlobalVars
       self =~ $_
+      # rubocop:enable Style/SpecialGlobalVars
     end
 
     def method_missing(mtd, *args, &block)
@@ -288,7 +288,7 @@ module Reggaexp
     end
 
     def alternating_or?
-      clauses  = @clause_opts.map.with_index { |h, idx| h.key?(:or) }
+      clauses  = @clause_opts.map { |h| h.key?(:or) }
       expected = !clauses.shift
 
       clauses.all? do |bool|
@@ -348,11 +348,15 @@ module Reggaexp
     def maybe_simplify_quantifier(quantifier)
       if quantifier.is_a?(Array) || quantifier.is_a?(Range)
         min, max = [quantifier.first, quantifier.last].map(&:to_i)
+        no_end   = quantifier.last.nil?
 
+        # rubocop doesn't support Ruby < 2.2.0 anymore
+        # rubocop:disable Style/NumericPredicate
         return ''  if min == max && min == 1
-        return '+' if quantifier.last.nil? && min == 1
-        return '*' if quantifier.last.nil? && min == 0
-        return '?' if min == 0 && max == 1
+        return '+' if no_end     && min == 1
+        return '*' if no_end     && min == 0
+        return '?' if min == 0   && max == 1
+        # rubocop:enable Style/NumericPredicate
       end
 
       quantifier
@@ -399,7 +403,6 @@ module Reggaexp
       strs  = non_capturing_group atoms
 
       if chars.size == 1 && chars.first.tr('\\', '').match(/\A.\z/)
-        # char = ESCAPE.include?(chars.first) ? chars.first.tr('\\', '') : chars.first
         strs << escape(chars.first)
       elsif chars.any?
         strs << "[#{chars.join}]"
