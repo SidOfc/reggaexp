@@ -33,56 +33,56 @@ module Reggaexp
       remove_flag :m
     end
 
-    def start_of_line(*args)
-      parse(*args, prepend: '^')
+    def start_of_line(*args, &block)
+      parse(*args, prepend: '^', &block)
     end
 
-    def start_of_string(*args)
-      parse(*args, prepend: '\A')
+    def start_of_string(*args, &block)
+      parse(*args, prepend: '\A', &block)
     end
 
-    def end_of_line(*args)
-      parse(*args, append:  '$')
+    def end_of_line(*args, &block)
+      parse(*args, append:  '$', &block)
     end
 
-    def end_of_string(*args)
-      parse(*args, append: '\z')
+    def end_of_string(*args, &block)
+      parse(*args, append: '\z', &block)
     end
 
-    def one_or_more(*args)
-      parse(*args, quantifier: '+')
+    def one_or_more(*args, &block)
+      parse(*args, quantifier: '+', &block)
     end
     alias at_least_one one_or_more
 
-    def zero_or_more(*args)
-      parse(*args, quantifier: '*')
+    def zero_or_more(*args, &block)
+      parse(*args, quantifier: '*', &block)
     end
     alias maybe_multiple zero_or_more
 
-    def zero_or_one(*args)
-      parse(*args, quantifier: '?')
+    def zero_or_one(*args, &block)
+      parse(*args, quantifier: '?', &block)
     end
     alias maybe zero_or_one
 
-    def repeat(amount, *args)
-      parse(*args, quantifier: "{#{amount}}")
+    def repeat(amount, *args, &block)
+      parse(*args, quantifier: "{#{amount}}", &block)
     end
 
-    def times(amount)
-      parse quantifier: "{#{amount}}"
+    def times(amount, &block)
+      parse quantifier: "{#{amount}}", &block
     end
 
-    def between(rng_or_ary, *args)
-      parse(*args, quantifier: [rng_or_ary.first, rng_or_ary.last])
+    def between(rng_or_ary, *args, &block)
+      parse(*args, quantifier: [rng_or_ary.first, rng_or_ary.last], &block)
     end
 
-    def at_least(amount, *args)
-      parse(*args, quantifier: [amount, nil])
+    def at_least(amount, *args, &block)
+      parse(*args, quantifier: [amount, nil], &block)
     end
     alias min at_least
 
-    def at_most(amount, *args)
-      parse(*args, quantifier: [nil, amount])
+    def at_most(amount, *args, &block)
+      parse(*args, quantifier: [nil, amount], &block)
     end
     alias max at_most
 
@@ -94,16 +94,16 @@ module Reggaexp
       parse(*args, opts.merge(capture: true), &block)
     end
 
-    def not(*args)
-      parse(*args, non_capture: false, prepend: '(?!', append: ')')
+    def not(*args, &block)
+      parse(*args, non_capture: false, prepend: '(?!', append: ')', &block)
     end
 
-    def preceded_by(*args)
-      parse(*args, non_capture: false, prepend: '(?<=', append: ')')
+    def preceded_by(*args, &block)
+      parse(*args, non_capture: false, prepend: '(?<=', append: ')', &block)
     end
 
-    def not_preceded_by(*args)
-      parse(*args, non_capture: false, prepend: '(?<!', append: ')')
+    def not_preceded_by(*args, &block)
+      parse(*args, non_capture: false, prepend: '(?<!', append: ')', &block)
     end
 
     def or(*args, &block)

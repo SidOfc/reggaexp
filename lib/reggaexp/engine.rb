@@ -102,6 +102,8 @@ module Reggaexp
       self
     end
 
+    # when a block is given, parse it in a new instance of self
+    # and append it as a clause
     def parse_block(**opts, &block)
       sub_pattern = self.class.new(&block)
       append_clause sub_pattern.parse, opts
