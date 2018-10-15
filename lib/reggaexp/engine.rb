@@ -225,7 +225,7 @@ module Reggaexp
 
     def compiled_pattern
       clauses.map.with_index do |atoms, idx|
-        strs = exprs_from_atoms atoms
+        strs = exprs_from_atoms atoms, **info_for_clause(idx)
 
         next parse_atom idx, strs.first if strs.size == 1
         next parse_atom idx, strs.join('|'), non_capture: !in_or? if strs.any?
@@ -394,8 +394,8 @@ module Reggaexp
 
     # converts ranges to correct min-max format and puts
     # all single chars in one character class
-    def exprs_from_atoms(atoms)
-      return sub_expr atoms if atoms.is_a? self.class
+    def exprs_from_atoms(atoms, **opts)
+      return sub_expr(atoms, **opts) if atoms.is_a? self.class
 
       atoms = atoms_after_flags atoms
       chars = character_class atoms
@@ -411,9 +411,34 @@ module Reggaexp
       strs
     end
 
-    def sub_expr(reggaexp)
-      pat = reggaexp.clear_flags!.add_flags(*flags).pattern
-      [pat.inspect[1..-(reggaexp.flags.length + 2)]]
+    def pattern_entirely_grouped?(chars = nil)
+      group_level     = 0
+      pattern_array   = chars || pattern.inspect.gsub(/\/\w*\z/, '/')[1..-2].split(/(?=\\)|(?<!\\)/)
+      frst, *mdl, lst = pattern_array.map do |char|
+        case char
+        when '('
+          group_level += 1
+          group_level - 1
+        when ')' then group_level -= 1
+        else group_level
+        end
+      end
+
+      mdl.all? { |l| l > frst && l > lst }
+    end
+
+    def sub_expr(reggaexp, **opts)
+      outer_capture = opts[:capture] || opts[:as] || opts[:non_capture]
+      pat           = reggaexp.clear_flags!.add_flags(*flags).pattern
+                              .inspect.gsub(%r{\$?/\w*\z}, '/')
+                              .gsub(%r{(?<!\\)\\[Az]}, '')
+
+      if outer_capture && reggaexp.pattern_entirely_grouped?
+        [pat.gsub(%r{\)/\z}, '/')
+            .gsub(%r{/\^?\((?:\?(?:<?[!=]|<\w+>|:))?}, '/')[1..-2]]
+      else
+        [pat[1..-(reggaexp.flags.length + 2)]]
+      end
     end
 
     # apply flags to atoms and remove duplicates
