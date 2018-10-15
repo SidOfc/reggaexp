@@ -1,9 +1,6 @@
 # Reggaexp
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/reggaexp`. To experiment with that code, run `bin/console` for an interactive prompt.
-
 A lot more tests and example regular expressions are still to be added before this project goes live.
-For now, smoke one and check back a bit later :)
 
 ## Installation
 
