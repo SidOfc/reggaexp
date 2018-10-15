@@ -316,7 +316,6 @@ module Reggaexp
 
       maybe_prepend(nil, **opts) +
         maybe_with_capture(content, **opts) +
-        maybe_with_quantifier(nil, **opts) +
         maybe_append(nil, **opts)
     end
 
@@ -389,8 +388,7 @@ module Reggaexp
 
       str  = (capture || non_capt ? '(' : '')
       str += (name ? "?<#{name}>" : capt_type)
-      str += content
-
+      str += maybe_with_quantifier(content, **opts)
       str + (capture || non_capt ? ')' : '')
     end
 
