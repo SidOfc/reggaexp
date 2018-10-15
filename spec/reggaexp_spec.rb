@@ -400,6 +400,11 @@ RSpec.describe Reggaexp do
         expect(builder.start_of_line(:a..:z)).to eq(/^[a-z]/)
       end
 
+      it 'creates a capture group' do
+        expect(builder.start_of_line(:a..:z, capture: true)).to eq(/^([a-z])/)
+        expect(builder.start_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])/)
+      end
+
       it 'accepts a block' do
         expect(builder.start_of_line { find(:a..:z) }).to eq(/^[a-z]/)
       end
@@ -409,6 +414,11 @@ RSpec.describe Reggaexp do
       it 'creates a pattern matching at start of string' do
         expect(builder.start_of_string).to eq(/\A/)
         expect(builder.start_of_string(:a..:z)).to eq(/\A[a-z]/)
+      end
+
+      it 'creates a capture group' do
+        expect(builder.start_of_string(:a..:z, capture: true)).to eq(/\A([a-z])/)
+        expect(builder.start_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])/)
       end
 
       it 'accepts a block' do
@@ -422,6 +432,11 @@ RSpec.describe Reggaexp do
         expect(builder.end_of_line(:a..:z)).to eq(/[a-z]$/)
       end
 
+      it 'creates a capture group' do
+        expect(builder.end_of_line(:a..:z, capture: true)).to eq(/([a-z])$/)
+        expect(builder.end_of_line(:a..:z, as: :named)).to eq(/(?<named>[a-z])$/)
+      end
+
       it 'accepts a block' do
         expect(builder.end_of_line { find(:a..:z) }).to eq(/[a-z]$/)
       end
@@ -431,6 +446,11 @@ RSpec.describe Reggaexp do
       it 'creates a pattern matching at end of string' do
         expect(builder.end_of_string).to eq(/\z/)
         expect(builder.end_of_string(:a..:z)).to eq(/[a-z]\z/)
+      end
+
+      it 'creates a capture group' do
+        expect(builder.end_of_string(:a..:z, capture: true)).to eq(/([a-z])\z/)
+        expect(builder.end_of_string(:a..:z, as: :named)).to eq(/(?<named>[a-z])\z/)
       end
 
       it 'accepts a block' do
@@ -443,6 +463,11 @@ RSpec.describe Reggaexp do
         expect(builder.zero_or_one(:a)).to eq(/a?/)
       end
 
+      it 'creates a capture group' do
+        expect(builder.zero_or_one(:a..:z, capture: true)).to eq(/([a-z]?)/)
+        expect(builder.zero_or_one(:a..:z, as: :named)).to eq(/(?<named>[a-z]?)/)
+      end
+
       it 'accepts a block' do
         expect(builder.zero_or_one { find(:a..:z) }).to eq(/[a-z]?/)
       end
@@ -451,6 +476,11 @@ RSpec.describe Reggaexp do
     context '#zero_or_more' do
       it 'creates a pattern matching zero or more occurences' do
         expect(builder.zero_or_more(:a)).to eq(/a*/)
+      end
+
+      it 'creates a capture group' do
+        expect(builder.zero_or_more(:a..:z, capture: true)).to eq(/([a-z]*)/)
+        expect(builder.zero_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]*)/)
       end
 
       it 'accepts a block' do
@@ -463,6 +493,11 @@ RSpec.describe Reggaexp do
         expect(builder.one_or_more(:a)).to eq(/a+/)
       end
 
+      it 'creates a capture group' do
+        expect(builder.one_or_more(:a..:z, capture: true)).to eq(/([a-z]+)/)
+        expect(builder.one_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]+)/)
+      end
+
       it 'accepts a block' do
         expect(builder.one_or_more { find(:a..:z) }).to eq(/[a-z]+/)
       end
@@ -471,6 +506,11 @@ RSpec.describe Reggaexp do
     context '#between' do
       it 'creates a pattern matching between [min] and [max] occurences' do
         expect(builder.between(1..4, :a)).to eq(/a{1,4}/)
+      end
+
+      it 'creates a capture group' do
+        expect(builder.between(1..4, :a, capture: true)).to eq(/(a{1,4})/)
+        expect(builder.between(1..4, :a, as: :named)).to eq(/(?<named>a{1,4})/)
       end
 
       it 'accepts a block' do
@@ -483,6 +523,11 @@ RSpec.describe Reggaexp do
         expect(builder.at_most(3, :a)).to eq(/a{,3}/)
       end
 
+      it 'creates a capture group' do
+        expect(builder.at_most(3, :a, capture: true)).to eq(/(a{,3})/)
+        expect(builder.at_most(3, :a, as: :named)).to eq(/(?<named>a{,3})/)
+      end
+
       it 'accepts a block' do
         expect(builder.at_most(3) { find(:a..:z) }).to eq(/[a-z]{,3}/)
       end
@@ -491,6 +536,11 @@ RSpec.describe Reggaexp do
     context '#at_least' do
       it 'creates a pattern matching at least [amount] occurences' do
         expect(builder.at_least(3, :a)).to eq(/a{3,}/)
+      end
+
+      it 'creates a capture group' do
+        expect(builder.at_least(3, :a, capture: true)).to eq(/(a{3,})/)
+        expect(builder.at_least(3, :a, as: :named)).to eq(/(?<named>a{3,})/)
       end
 
       it 'accepts a block' do
@@ -506,6 +556,11 @@ RSpec.describe Reggaexp do
         expect(pattern =~ '012').to be_falsy
       end
 
+      it 'does not create a capture group' do
+        expect(Reggaexp.not_preceded_by('a', capture: true)).to eq(/(?<!a)/)
+        expect(Reggaexp.not_preceded_by('a', as: :named)).to eq(/(?<!a)/)
+      end
+
       it 'accepts a block' do
         expect(builder.not_preceded_by { find(:a..:z) }).to eq(/(?<![a-z])/)
       end
@@ -517,6 +572,11 @@ RSpec.describe Reggaexp do
       it 'matches when preceded by found' do
         expect(pattern =~ '123').to be_falsy
         expect(pattern =~ '012').to be_truthy
+      end
+
+      it 'does not create a capture group' do
+        expect(Reggaexp.preceded_by('a', capture: true)).to eq(/(?<=a)/)
+        expect(Reggaexp.preceded_by('a', as: :named)).to eq(/(?<=a)/)
       end
 
       it 'accepts a block' do
@@ -532,6 +592,11 @@ RSpec.describe Reggaexp do
       it 'does not create a non capture group if not needed' do
         expect(builder.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
       end
+
+      it 'creates a capture group' do
+        expect(builder.capture { at_least(3, :a).or.at_most(2, :b) }).to eq(/(a{3,}|b{,2})/)
+      end
+
 
       it 'accepts a block' do
         expect(builder.at_least(3, :a).or { at_most(2, :b) }).to eq(/a{3,}|b{,2}/)
