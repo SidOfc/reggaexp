@@ -12,3 +12,13 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 end
+
+# print expected regular expression result
+# instead of entire class
+module Reggaexp
+  class Engine
+    def inspect
+      pattern.inspect
+    end
+  end
+end
