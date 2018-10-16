@@ -9,7 +9,7 @@ module Reggaexp
     # characters that need to be escaped outside and within a
     # character-class respectively.
     ESCAPE                 = %w[{ } ( ) [ ] | ? * + . ^ $ \\].freeze
-    CHARACTER_CLASS_ESCAPE = %w{- ]}.freeze
+    CHARACTER_CLASS_ESCAPE = %w{- ] \\}.freeze
     PRESETS                = {
       word:       '\w',
       number:     0..9,
@@ -111,7 +111,7 @@ module Reggaexp
 
     # filter elements for a character class
     def character_class(flat_args)
-      flat_args.select { |a| a.is_a?(String) && a.tr('\\', '').length == 1 } +
+      flat_args.select { |a| a.is_a?(String) && a.tr('\\', '').length <= 1 } +
         flat_args.select(&Range.method(:===))
     end
 
@@ -397,15 +397,16 @@ module Reggaexp
     def exprs_from_atoms(atoms, **opts)
       return sub_expr(atoms, **opts) if atoms.is_a? self.class
 
-      atoms = atoms_after_flags atoms
-      chars = character_class atoms
-      chars = chars.map { |c| c.is_a?(Range) ? range_bounds(c).join('-') : c }
-      strs  = non_capturing_group atoms
+      atoms     = atoms_after_flags atoms
+      chars     = character_class atoms
+      chars     = chars.map { |c| c.is_a?(Range) ? range_bounds(c).join('-') : c }
+      strs      = non_capturing_group atoms
+      opt_group = chars.size == 1 && chars.first !~ /\A.-.\z/
 
-      if chars.size == 1 && chars.first.tr('\\', '').match(/\A.\z/)
-        strs << escape(chars.first)
+      if opt_group
+        strs << escape(unescape(chars.first))
       elsif chars.any?
-        strs << "[#{chars.join}]"
+        strs << "#{opt_group ? '' : '['}#{chars.join}#{opt_group ? '' : ']'}"
       end
 
       strs
@@ -543,6 +544,14 @@ module Reggaexp
       input.to_s.split(/(?=\\)|(?<!\\)/).map do |c|
         CHARACTER_CLASS_ESCAPE.include?(c) ? "\\#{c}" : c
       end.join
+    end
+
+    def unescape(input)
+      res = (ESCAPE | CHARACTER_CLASS_ESCAPE).reduce input do |str, esc|
+        str.gsub(/\\(#{escape(esc)})/, '\1')
+      end
+
+      res
     end
 
     # parse value of known flags into Regexp.compile
