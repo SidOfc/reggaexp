@@ -617,6 +617,25 @@ RSpec.describe Reggaexp do
     end
   end
 
+  # This is going to be a fun one
+  context 'Replace regex used internally with Reggaexp' do
+    it 'could replace string character split regex' do
+      expect(Reggaexp.is('\\').or.not_preceded_by('\\')).to eq(/(?=\\)|(?<!\\)/)
+    end
+
+    it 'could replace start/end of string pattern regex' do
+      expect(Reggaexp.not_preceded_by('\\').then('\\').then('A', 'z')).to eq(
+        /(?<!\\)\\[Az]/
+      )
+    end
+
+    it 'could replace flag + end of line removal regex' do
+      expect(Reggaexp.maybe('$').then('/')
+                     .maybe_multiple(:word)
+                     .end_of_string).to eq(%r{\$?/\w*\z})
+    end
+  end
+
   context 'Examples' do
     context 'Postal codes' do
       it 'matches an NL postal code' do
