@@ -595,6 +595,9 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.capture { at_least(3, :a).or.at_most(2, :b) }).to eq(/(a{3,}|b{,2})/)
       end
 
+      it 'can take a count (number or numeric range) as first argument' do
+        expect(Reggaexp.start_of_string(3, :a)).to eq(/\Aa{3}/)
+      end
 
       it 'accepts a block' do
         expect(Reggaexp.at_least(3, :a).or { at_most(2, :b) }).to eq(/a{3,}|b{,2}/)
@@ -636,6 +639,9 @@ RSpec.describe Reggaexp do
               .maybe_multiple(:whitespace)
               .maybe(5, :digits)
           }
+
+        expect(pattern =~ '1234 - 55555').to be_truthy
+        expect(pattern =~ '123A - 55555').to be_falsy
       end
     end
 
@@ -657,6 +663,7 @@ RSpec.describe Reggaexp do
           .maybe('-')
           .maybe_multiple(:whitespace)
           .between(4..6, :digits)
+          .end_of_string
       end
 
       it 'matches a US phone number' do

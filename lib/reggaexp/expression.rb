@@ -111,15 +111,22 @@ module Reggaexp
                                prepend: '(?!', append: ')'), &block)
     end
 
+    def is(*args, **opts, &block)
+      find(*args, **opts.merge(non_capture: false, capture: false, as: nil,
+                               prepend: '(?=', append: ')'), &block)
+    end
+
     def preceded_by(*args, **opts, &block)
       find(*args, **opts.merge(non_capture: false, capture: false, as: nil,
                                prepend: '(?<=', append: ')'), &block)
     end
+    alias prev preceded_by
 
     def not_preceded_by(*args, **opts, &block)
       find(*args, **opts.merge(non_capture: false, capture: false, as: nil,
                                prepend: '(?<!', append: ')'), &block)
     end
+    alias not_prev not_preceded_by
 
     def or(*args, **opts, &block)
       opts.delete :or
