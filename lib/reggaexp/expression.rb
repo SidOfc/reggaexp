@@ -11,13 +11,13 @@ module Reggaexp
                    numeric_range?(maybe_count)
 
       if quantifier
-        return repeat maybe_count.to_i, *args if maybe_count.is_a? Numeric
+        return repeat(maybe_count.to_i, *args, **opts) if maybe_count.is_a? Numeric
 
         between(maybe_count.minmax, *args, **opts)
       else
         args.unshift maybe_count unless maybe_count.nil?
 
-        parse(*args.compact, **opts, &block)
+        parse(*args, **opts, &block)
       end
     end
     alias then   find
@@ -78,12 +78,8 @@ module Reggaexp
     end
     alias maybe zero_or_one
 
-    def repeat(amount, *args, &block)
-      find(*args, quantifier: "{#{amount}}", &block)
-    end
-
-    def times(amount, &block)
-      find quantifier: "{#{amount}}", &block
+    def repeat(amount, *args, **opts, &block)
+      find(*args, **opts.merge(quantifier: "{#{amount}}"), &block)
     end
 
     def between(rng_or_ary, *args, **opts, &block)
