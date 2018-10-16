@@ -166,6 +166,18 @@ RSpec.describe Reggaexp do
       end
 
       context 'Capture groups and non capture groups' do
+        it 'escapes backslashes' do
+          expect(Reggaexp.find('a', '\\')).to eq(/[a\\]/)
+        end
+
+        it 'escapes closing square brackets' do
+          expect(Reggaexp.find('a', ']')).to eq(/[a\]]/)
+        end
+
+        it 'escapes closing dashes' do
+          expect(Reggaexp.find('a', '-')).to eq(/[a\-]/)
+        end
+
         it 'filters multi-character strings for non-capture-group usage' do
           expect(non_capturing_group('a', 'abc', 'q', 123, :b)).to(
             contain_exactly('123', 'abc')
