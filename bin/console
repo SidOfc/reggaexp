@@ -4,6 +4,23 @@ require 'bundler/setup'
 require 'pry'
 require 'reggaexp'
 
-@expr = Reggaexp::Expression.new
+@expr = Reggaexp
+          .start_of_string(:word, '"')
+          .zero_or_more(:word, *%w[- . + "])
+          .then(:word, '"')
+          .then('@')
+          .then {
+            find(:alphanum)
+              .one_or_more(:alphanum, '-')
+              .group { find('.').one_or_more(:letter, '-') }.zero_or_more
+              .then('.')
+              .one_or_more(:letter)
+          }
+          .or {
+            group { find(3, :digits).then('.') }
+              .find(3)
+              .find(3, :digits)
+          }
+          .end_of_string
 
 Pry.start
