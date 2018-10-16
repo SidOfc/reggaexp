@@ -3,35 +3,23 @@
 # of argument order.
 
 RSpec.describe Reggaexp do
-  def builder
-    Reggaexp::Expression.new
-  end
-
-  def with_flags(*flags)
-    builder.add_flags(*flags)
-  end
-
   def clause(*args, **opts)
-    builder.find(*args, **opts).clauses.flatten
-  end
-
-  def pattern(*args, **opts)
-    builder.find(*args, **opts)
+    Reggaexp.find(*args, **opts).clauses.flatten
   end
 
   def character_class(*args)
-    builder.character_class clause(*args)
+    Reggaexp.character_class clause(*args)
   end
 
   def non_capturing_group(*args)
-    builder.non_capturing_group clause(*args)
+    Reggaexp.non_capturing_group clause(*args)
   end
 
   context Reggaexp::Engine do
     context 'Argument parsing' do
       context 'Block' do
         it 'creates a sub-expression' do
-          expect(builder.find { one_or_more(:a).or(:abc) }.then(:q)).to eq(/(?:a+|abc)q/)
+          expect(Reggaexp.find { one_or_more(:a).or(:abc) }.then(:q)).to eq(/(?:a+|abc)q/)
         end
       end
 
@@ -58,6 +46,10 @@ RSpec.describe Reggaexp do
           expect(clause(:digits)).to     eq clause(:numbers)
           expect(clause(:chars)).to      eq clause(:letters)
           expect(clause(:characters)).to eq clause(:letters)
+        end
+
+        it 'correctly interpolates symbol presets that contain a backslash' do
+          expect(Reggaexp.start_of_string(:whitespace, :tab)).to eq(/\A[\s\t]/)
         end
       end
 
@@ -137,23 +129,23 @@ RSpec.describe Reggaexp do
     context 'Expression components' do
       context 'Start and end of line / string' do
         it 'creates a pattern matching the start of a line' do
-          expect(pattern('abc', prepend: '^')).to match 'abc'
-          expect(pattern('abc', prepend: '^')).not_to match 'xabc'
+          expect(Reggaexp.find('abc', prepend: '^')).to match 'abc'
+          expect(Reggaexp.find('abc', prepend: '^')).not_to match 'xabc'
         end
 
         it 'creates a pattern matching the start of a string' do
-          expect(pattern('abc', prepend: '\A')).to match "abc"
-          expect(pattern('abc', prepend: '\A')).not_to match "\nabc"
+          expect(Reggaexp.find('abc', prepend: '\A')).to match "abc"
+          expect(Reggaexp.find('abc', prepend: '\A')).not_to match "\nabc"
         end
 
         it 'creates a pattern matching the end of a line' do
-          expect(pattern('abc', append: '$')).to match "abc"
-          expect(pattern('abc', append: '$')).not_to match "abcx"
+          expect(Reggaexp.find('abc', append: '$')).to match "abc"
+          expect(Reggaexp.find('abc', append: '$')).not_to match "abcx"
         end
 
         it 'creates a pattern matching the end of a string' do
-          expect(pattern('abc', append: '\z')).to match "abc"
-          expect(pattern('abc', append: '\z')).not_to match "abc\n"
+          expect(Reggaexp.find('abc', append: '\z')).to match "abc"
+          expect(Reggaexp.find('abc', append: '\z')).not_to match "abc\n"
         end
       end
 
@@ -165,11 +157,11 @@ RSpec.describe Reggaexp do
         end
 
         it 'creates a character class with single-length strings and ranges' do
-          expect(pattern(:q, :a..:f)).to eq(/[qa-f]/)
+          expect(Reggaexp.find(:q, :a..:f)).to eq(/[qa-f]/)
         end
 
         it 'only generates a character class when needed' do
-          expect(pattern(:q)).to eq(/q/)
+          expect(Reggaexp.find(:q)).to eq(/q/)
         end
       end
 
@@ -180,70 +172,74 @@ RSpec.describe Reggaexp do
           )
         end
 
+        it 'removes double (or more) capture groups' do
+          expect(Reggaexp.group { group { group { find(:a) } } }).to eq(/(?:a)/)
+        end
+
         it 'creates a capture group when capture: true is given' do
-          match_data = pattern('hello', capture: true).match('hello')
+          match_data = Reggaexp.find('hello', capture: true).match('hello')
           expect(match_data[1]).to eq 'hello'
         end
 
         it 'does not create a capture group when capture: false' do
-          match_data = pattern('hello', capture: false).match('hello')
+          match_data = Reggaexp.find('hello', capture: false).match('hello')
           expect(match_data[1]).to be_nil
         end
 
         it 'creates a named capture group when as: :name is given' do
-          match_data = pattern('hello', as: :name).match('hello')
+          match_data = Reggaexp.find('hello', as: :name).match('hello')
           expect(match_data[:name]).to eq 'hello'
         end
 
         it 'creates a non-capturing group around strings when not capturing' do
-          expect(pattern('hello', 'goodbye')).to eq(/(?:hello|goodbye)/)
+          expect(Reggaexp.find('hello', 'goodbye')).to eq(/(?:hello|goodbye)/)
         end
       end
 
       context 'Quantifiers' do
         it 'applies "one_or_more"' do
-          expect(pattern('a', quantifier: '+')).to eq(/a+/)
+          expect(Reggaexp.find('a', quantifier: '+')).to eq(/a+/)
         end
 
         it 'applies "zero_or_more"' do
-          expect(pattern('a', quantifier: '*')).to eq(/a*/)
+          expect(Reggaexp.find('a', quantifier: '*')).to eq(/a*/)
         end
 
         it 'applies "optional"' do
-          expect(pattern('a', quantifier: '?')).to eq(/a?/)
+          expect(Reggaexp.find('a', quantifier: '?')).to eq(/a?/)
         end
 
         it 'applies "between"' do
-          expect(pattern('a', quantifier: 1..3)).to   eq(/a{1,3}/)
-          expect(pattern('a', quantifier: [1, 3])).to eq(/a{1,3}/)
+          expect(Reggaexp.find('a', quantifier: 1..3)).to   eq(/a{1,3}/)
+          expect(Reggaexp.find('a', quantifier: [1, 3])).to eq(/a{1,3}/)
         end
 
         it 'does not apply redundant quantifier' do
-          expect(pattern('a', quantifier: [1])).to eq(/a/)
-          expect(pattern('a', quantifier: [1, 1])).to eq(/a/)
+          expect(Reggaexp.find('a', quantifier: [1])).to eq(/a/)
+          expect(Reggaexp.find('a', quantifier: [1, 1])).to eq(/a/)
         end
 
         it 'simplifies between(1, inf) to "+"' do
-          expect(pattern('a', quantifier: [1, nil])).to eq(/a+/)
+          expect(Reggaexp.find('a', quantifier: [1, nil])).to eq(/a+/)
         end
 
         it 'simplifies between(0, inf) to "*"' do
-          expect(pattern('a', quantifier: [0, nil])).to eq(/a*/)
+          expect(Reggaexp.find('a', quantifier: [0, nil])).to eq(/a*/)
         end
 
         it 'simplifies between(0, 1) to "?"' do
-          expect(pattern('a', quantifier: [0, 1])).to eq(/a?/)
+          expect(Reggaexp.find('a', quantifier: [0, 1])).to eq(/a?/)
         end
       end
 
       context 'Regular expression flags' do
         context 'Simplifies clauses' do
           it 'downcases all uppercase groups with case-insensitive flag' do
-            expect(with_flags(:i).find(:a..:d, :X..:Z)).to eq(/[x-za-d]/i)
+            expect(Reggaexp.add_flag(:i).find(:a..:d, :X..:Z)).to eq(/[x-za-d]/i)
           end
 
           it 'removes duplicate ranges with case-insensitive flag' do
-            expect(with_flags(:i).find(:a..:z, :A..:Z)).to eq(/[a-z]/i)
+            expect(Reggaexp.add_flag(:i).find(:a..:z, :A..:Z)).to eq(/[a-z]/i)
           end
         end
 
@@ -321,16 +317,18 @@ RSpec.describe Reggaexp do
 
       context 'Escaping' do
         it 'escapes special characters outside character classes' do
-          expect(pattern('$|^*+.[({})]') =~ '$|^*+.[({})]').to be_truthy
+          expect(Reggaexp.find('$|^*+.[({})]') =~ '$|^*+.[({})]').to be_truthy
         end
 
         it 'escapes special characters inside character classes' do
-          expect(pattern('$', ']', '-', :a..:f)).to eq(/[$\]\-a-f]/)
+          expect(Reggaexp.find('$', ']', '-', :a..:f)).to eq(/[$\]\-a-f]/)
         end
       end
     end
 
     context 'Mimicks Regexp' do
+      let!(:pattern) { Reggaexp::Expression.new }
+
       it 'responds to #match' do
         expect(pattern).to respond_to :match
       end
@@ -396,155 +394,155 @@ RSpec.describe Reggaexp do
   context Reggaexp::Expression do
     context '#start_of_line' do
       it 'creates a pattern matching at start of line' do
-        expect(builder.start_of_line).to eq(/^/)
-        expect(builder.start_of_line(:a..:z)).to eq(/^[a-z]/)
+        expect(Reggaexp.start_of_line).to eq(/^/)
+        expect(Reggaexp.start_of_line(:a..:z)).to eq(/^[a-z]/)
       end
 
       it 'creates a capture group' do
-        expect(builder.start_of_line(:a..:z, capture: true)).to eq(/^([a-z])/)
-        expect(builder.start_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])/)
+        expect(Reggaexp.start_of_line(:a..:z, capture: true)).to eq(/^([a-z])/)
+        expect(Reggaexp.start_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])/)
       end
 
       it 'accepts a block' do
-        expect(builder.start_of_line { find(:a..:z) }).to eq(/^[a-z]/)
+        expect(Reggaexp.start_of_line { find(:a..:z) }).to eq(/^[a-z]/)
       end
     end
 
     context '#start_of_string' do
       it 'creates a pattern matching at start of string' do
-        expect(builder.start_of_string).to eq(/\A/)
-        expect(builder.start_of_string(:a..:z)).to eq(/\A[a-z]/)
+        expect(Reggaexp.start_of_string).to eq(/\A/)
+        expect(Reggaexp.start_of_string(:a..:z)).to eq(/\A[a-z]/)
       end
 
       it 'creates a capture group' do
-        expect(builder.start_of_string(:a..:z, capture: true)).to eq(/\A([a-z])/)
-        expect(builder.start_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])/)
+        expect(Reggaexp.start_of_string(:a..:z, capture: true)).to eq(/\A([a-z])/)
+        expect(Reggaexp.start_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])/)
       end
 
       it 'accepts a block' do
-        expect(builder.start_of_string { find(:a..:z) }).to eq(/\A[a-z]/)
+        expect(Reggaexp.start_of_string { find(:a..:z) }).to eq(/\A[a-z]/)
       end
     end
 
     context '#end_of_line' do
       it 'creates a pattern matching at end of line' do
-        expect(builder.end_of_line).to eq(/$/)
-        expect(builder.end_of_line(:a..:z)).to eq(/[a-z]$/)
+        expect(Reggaexp.end_of_line).to eq(/$/)
+        expect(Reggaexp.end_of_line(:a..:z)).to eq(/[a-z]$/)
       end
 
       it 'creates a capture group' do
-        expect(builder.end_of_line(:a..:z, capture: true)).to eq(/([a-z])$/)
-        expect(builder.end_of_line(:a..:z, as: :named)).to eq(/(?<named>[a-z])$/)
+        expect(Reggaexp.end_of_line(:a..:z, capture: true)).to eq(/([a-z])$/)
+        expect(Reggaexp.end_of_line(:a..:z, as: :named)).to eq(/(?<named>[a-z])$/)
       end
 
       it 'accepts a block' do
-        expect(builder.end_of_line { find(:a..:z) }).to eq(/[a-z]$/)
+        expect(Reggaexp.end_of_line { find(:a..:z) }).to eq(/[a-z]$/)
       end
     end
 
     context '#end_of_string' do
       it 'creates a pattern matching at end of string' do
-        expect(builder.end_of_string).to eq(/\z/)
-        expect(builder.end_of_string(:a..:z)).to eq(/[a-z]\z/)
+        expect(Reggaexp.end_of_string).to eq(/\z/)
+        expect(Reggaexp.end_of_string(:a..:z)).to eq(/[a-z]\z/)
       end
 
       it 'creates a capture group' do
-        expect(builder.end_of_string(:a..:z, capture: true)).to eq(/([a-z])\z/)
-        expect(builder.end_of_string(:a..:z, as: :named)).to eq(/(?<named>[a-z])\z/)
+        expect(Reggaexp.end_of_string(:a..:z, capture: true)).to eq(/([a-z])\z/)
+        expect(Reggaexp.end_of_string(:a..:z, as: :named)).to eq(/(?<named>[a-z])\z/)
       end
 
       it 'accepts a block' do
-        expect(builder.end_of_string { find(:a..:z) }).to eq(/[a-z]\z/)
+        expect(Reggaexp.end_of_string { find(:a..:z) }).to eq(/[a-z]\z/)
       end
     end
 
     context '#zero_or_one' do
       it 'creates a pattern matching zero or one occurence' do
-        expect(builder.zero_or_one(:a)).to eq(/a?/)
+        expect(Reggaexp.zero_or_one(:a)).to eq(/a?/)
       end
 
       it 'creates a capture group' do
-        expect(builder.zero_or_one(:a..:z, capture: true)).to eq(/([a-z]?)/)
-        expect(builder.zero_or_one(:a..:z, as: :named)).to eq(/(?<named>[a-z]?)/)
+        expect(Reggaexp.zero_or_one(:a..:z, capture: true)).to eq(/([a-z]?)/)
+        expect(Reggaexp.zero_or_one(:a..:z, as: :named)).to eq(/(?<named>[a-z]?)/)
       end
 
       it 'accepts a block' do
-        expect(builder.zero_or_one { find(:a..:z) }).to eq(/[a-z]?/)
+        expect(Reggaexp.zero_or_one { find(:a..:z) }).to eq(/[a-z]?/)
       end
     end
 
     context '#zero_or_more' do
       it 'creates a pattern matching zero or more occurences' do
-        expect(builder.zero_or_more(:a)).to eq(/a*/)
+        expect(Reggaexp.zero_or_more(:a)).to eq(/a*/)
       end
 
       it 'creates a capture group' do
-        expect(builder.zero_or_more(:a..:z, capture: true)).to eq(/([a-z]*)/)
-        expect(builder.zero_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]*)/)
+        expect(Reggaexp.zero_or_more(:a..:z, capture: true)).to eq(/([a-z]*)/)
+        expect(Reggaexp.zero_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]*)/)
       end
 
       it 'accepts a block' do
-        expect(builder.zero_or_more { find(:a..:z) }).to eq(/[a-z]*/)
+        expect(Reggaexp.zero_or_more { find(:a..:z) }).to eq(/[a-z]*/)
       end
     end
 
     context '#one_or_more' do
       it 'creates a pattern matching one or more occurences' do
-        expect(builder.one_or_more(:a)).to eq(/a+/)
+        expect(Reggaexp.one_or_more(:a)).to eq(/a+/)
       end
 
       it 'creates a capture group' do
-        expect(builder.one_or_more(:a..:z, capture: true)).to eq(/([a-z]+)/)
-        expect(builder.one_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]+)/)
+        expect(Reggaexp.one_or_more(:a..:z, capture: true)).to eq(/([a-z]+)/)
+        expect(Reggaexp.one_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]+)/)
       end
 
       it 'accepts a block' do
-        expect(builder.one_or_more { find(:a..:z) }).to eq(/[a-z]+/)
+        expect(Reggaexp.one_or_more { find(:a..:z) }).to eq(/[a-z]+/)
       end
     end
 
     context '#between' do
       it 'creates a pattern matching between [min] and [max] occurences' do
-        expect(builder.between(1..4, :a)).to eq(/a{1,4}/)
+        expect(Reggaexp.between(1..4, :a)).to eq(/a{1,4}/)
       end
 
       it 'creates a capture group' do
-        expect(builder.between(1..4, :a, capture: true)).to eq(/(a{1,4})/)
-        expect(builder.between(1..4, :a, as: :named)).to eq(/(?<named>a{1,4})/)
+        expect(Reggaexp.between(1..4, :a, capture: true)).to eq(/(a{1,4})/)
+        expect(Reggaexp.between(1..4, :a, as: :named)).to eq(/(?<named>a{1,4})/)
       end
 
       it 'accepts a block' do
-        expect(builder.between(1..4) { find(:a..:z) }).to eq(/[a-z]{1,4}/)
+        expect(Reggaexp.between(1..4) { find(:a..:z) }).to eq(/[a-z]{1,4}/)
       end
     end
 
     context '#at_most' do
       it 'creates a pattern matching at most [amount] occurences' do
-        expect(builder.at_most(3, :a)).to eq(/a{,3}/)
+        expect(Reggaexp.at_most(3, :a)).to eq(/a{,3}/)
       end
 
       it 'creates a capture group' do
-        expect(builder.at_most(3, :a, capture: true)).to eq(/(a{,3})/)
-        expect(builder.at_most(3, :a, as: :named)).to eq(/(?<named>a{,3})/)
+        expect(Reggaexp.at_most(3, :a, capture: true)).to eq(/(a{,3})/)
+        expect(Reggaexp.at_most(3, :a, as: :named)).to eq(/(?<named>a{,3})/)
       end
 
       it 'accepts a block' do
-        expect(builder.at_most(3) { find(:a..:z) }).to eq(/[a-z]{,3}/)
+        expect(Reggaexp.at_most(3) { find(:a..:z) }).to eq(/[a-z]{,3}/)
       end
     end
 
     context '#at_least' do
       it 'creates a pattern matching at least [amount] occurences' do
-        expect(builder.at_least(3, :a)).to eq(/a{3,}/)
+        expect(Reggaexp.at_least(3, :a)).to eq(/a{3,}/)
       end
 
       it 'creates a capture group' do
-        expect(builder.at_least(3, :a, capture: true)).to eq(/(a{3,})/)
-        expect(builder.at_least(3, :a, as: :named)).to eq(/(?<named>a{3,})/)
+        expect(Reggaexp.at_least(3, :a, capture: true)).to eq(/(a{3,})/)
+        expect(Reggaexp.at_least(3, :a, as: :named)).to eq(/(?<named>a{3,})/)
       end
 
       it 'accepts a block' do
-        expect(builder.at_least(3) { find(:a..:z) }).to eq(/[a-z]{3,}/)
+        expect(Reggaexp.at_least(3) { find(:a..:z) }).to eq(/[a-z]{3,}/)
       end
     end
 
@@ -562,7 +560,7 @@ RSpec.describe Reggaexp do
       end
 
       it 'accepts a block' do
-        expect(builder.not_preceded_by { find(:a..:z) }).to eq(/(?<![a-z])/)
+        expect(Reggaexp.not_preceded_by { find(:a..:z) }).to eq(/(?<![a-z])/)
       end
     end
 
@@ -580,31 +578,31 @@ RSpec.describe Reggaexp do
       end
 
       it 'accepts a block' do
-        expect(builder.preceded_by { find(:a..:z) }).to eq(/(?<=[a-z])/)
+        expect(Reggaexp.preceded_by { find(:a..:z) }).to eq(/(?<=[a-z])/)
       end
     end
 
     context '#or' do
       it 'creates a simple pattern using or' do
-        expect(builder.at_least(3, :a).or.at_most(2, :b).then(:a)).to eq(/(?:a{3,}|b{,2})a/)
+        expect(Reggaexp.at_least(3, :a).or.at_most(2, :b).then(:a)).to eq(/(?:a{3,}|b{,2})a/)
       end
 
       it 'does not create a non capture group if not needed' do
-        expect(builder.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
+        expect(Reggaexp.at_least(3, :a).or.at_most(2, :b)).to eq(/a{3,}|b{,2}/)
       end
 
       it 'creates a capture group' do
-        expect(builder.capture { at_least(3, :a).or.at_most(2, :b) }).to eq(/(a{3,}|b{,2})/)
+        expect(Reggaexp.capture { at_least(3, :a).or.at_most(2, :b) }).to eq(/(a{3,}|b{,2})/)
       end
 
 
       it 'accepts a block' do
-        expect(builder.at_least(3, :a).or { at_most(2, :b) }).to eq(/a{3,}|b{,2}/)
+        expect(Reggaexp.at_least(3, :a).or { at_most(2, :b) }).to eq(/a{3,}|b{,2}/)
       end
 
       it 'groups multiple or clauses' do
         expect(
-          builder
+          Reggaexp
             .at_least(3, :a)
             .or.at_most(2, :b)
             .then(:a)
