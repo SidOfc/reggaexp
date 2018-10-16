@@ -547,7 +547,7 @@ RSpec.describe Reggaexp do
     end
 
     context '#not_preceded_by' do
-      let!(:pattern) { Reggaexp.start_of_line(1, :digit).not_preceded_by(0) }
+      let!(:pattern) { Reggaexp.start_of_line('1', :digit).not_preceded_by('0') }
 
       it 'does not match when preceded by found' do
         expect(pattern =~ '123').to be_truthy
@@ -565,7 +565,7 @@ RSpec.describe Reggaexp do
     end
 
     context '#preceded_by' do
-      let!(:pattern) { Reggaexp.start_of_line(1, :digit).preceded_by(0) }
+      let!(:pattern) { Reggaexp.start_of_line('1', :digit).preceded_by('0') }
 
       it 'matches when preceded by found' do
         expect(pattern =~ '123').to be_falsy
@@ -615,6 +615,30 @@ RSpec.describe Reggaexp do
   end
 
   context 'Examples' do
+    context 'Postal codes' do
+      it 'matches an NL postal code' do
+        pattern = Reggaexp
+                  .start_of_string(2, :a..:z)
+                  .maybe_multiple(:whitespace)
+                  .end_of_string(4, :digits)
+                  .case_insensitive
+
+        expect(pattern =~ 'AA0000').to be_truthy
+        expect(pattern =~ 'AA000O').to be_falsy
+      end
+
+      it 'matches a US postal code' do
+        pattern = Reggaexp
+          .start_of_string(4, :digits)
+          .maybe {
+            maybe_multiple(:whitespace)
+              .maybe('-')
+              .maybe_multiple(:whitespace)
+              .maybe(5, :digits)
+          }
+      end
+    end
+
     context 'Phone numbers' do
       let!(:pattern) do
         Reggaexp
@@ -649,7 +673,7 @@ RSpec.describe Reggaexp do
         expect(pattern =~ '+44155551234').to    be_truthy
       end
 
-      it 'matches a NL phone number' do
+      it 'matches an NL phone number' do
         expect(pattern =~ '0031 6 12345678').to  be_truthy
         expect(pattern =~ '+31 6 12345678').to   be_truthy
         expect(pattern =~ '+31 010 12345678').to be_truthy
