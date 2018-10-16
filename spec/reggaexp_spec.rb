@@ -681,11 +681,9 @@ RSpec.describe Reggaexp do
           .end_of_string
       end
 
-      # FIXME: there is an issue with flags and removing excess (non-/named-) capture groups
-
       it 'can handle an email address regex' do
         expect(pattern).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9A-Za-z][\-0-9A-Za-z]+(?:\.[\-A-Za-z]+)*\.[A-Za-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/)
-        # expect(pattern.case_insensitive).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9a-z][\-0-9a-z]+(?:\.[\-a-z]+)*\.[a-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/i)
+        expect(pattern.case_insensitive).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9a-z][\-0-9a-z]+(?:\.[\-a-z]+)*\.[a-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/i)
       end
 
       it 'identifies invalid email formats' do

@@ -431,14 +431,13 @@ module Reggaexp
       outer_capture = opts[:capture] || opts[:as] || opts[:non_capture]
       pat           = reggaexp.clear_flags!.add_flags(*flags).pattern
                               .inspect.gsub(%r{\$?/\w*\z}, '/')
-                              .gsub(%r{(?<!\\)\\[Az]}, '')
+                              .gsub(%r{(?<!\\)\\[Az]}, '')[1..-2]
 
-      if outer_capture && reggaexp.pattern_entirely_grouped?
-        [pat.gsub(%r{\)/\z}, '/')
-            .gsub(%r{/\^?\((?:\?(?:<?[!=]|<\w+>|:))?}, '/')[1..-2]]
-      else
-        [pat[1..-(reggaexp.flags.length + 2)]]
-      end
+      return [pat.gsub(%r{\A\^}, '')] \
+        unless outer_capture && reggaexp.pattern_entirely_grouped?
+
+      [pat.gsub(%r{\)\z}, '')
+          .gsub(%r{\A\^?\((?:\?(?:<?[!=]|<\w+>|:))?}, '')]
     end
 
     # apply flags to atoms and remove duplicates
@@ -555,18 +554,6 @@ module Reggaexp
         when :i then val | Regexp::IGNORECASE
         when :x then val | Regexp::EXTENDED
         end
-      end
-    end
-
-    if defined? Pry
-      def pry
-        binding.pry
-      end
-    end
-
-    if binding.respond_to? :irb
-      def irb
-        binding.irb
       end
     end
   end
