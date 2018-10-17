@@ -404,33 +404,29 @@ RSpec.describe Reggaexp do
   end
 
   context Reggaexp::Expression do
-    context '#start_to_end_of_line' do
-      it 'creates a pattern matching from start to end' do
-        expect(Reggaexp.start_to_end_of_line(:a)).to eq(/^a$/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.start_to_end_of_line(:a..:z, capture: true)).to eq(/^([a-z])$/)
-        expect(Reggaexp.start_to_end_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])$/)
+    context '#find' do
+      it 'creates a pattern' do
+        expect(Reggaexp.find(:a)).to eq(/a/)
       end
 
       it 'accepts a block' do
-        expect(Reggaexp.start_to_end_of_line { find(:a..:z) }).to eq(/^[a-z]$/)
+        expect(Reggaexp.find { maybe(:a) }).to eq(/a?/)
+      end
+
+      it 'creates a capture group' do
+        expect(Reggaexp.find(:a, as: :char)).to eq(/(?<char>a)/)
+      end
+    end
+
+    context '#start_to_end_of_line' do
+      it 'creates a pattern matching from start to end' do
+        expect(Reggaexp.start_to_end_of_line(:a)).to eq(/^a$/)
       end
     end
 
     context '#start_to_end_of_string' do
       it 'creates a pattern matching from start to end' do
         expect(Reggaexp.start_to_end_of_string(:a)).to eq(/\Aa\z/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.start_to_end_of_string(:a..:z, capture: true)).to eq(/\A([a-z])\z/)
-        expect(Reggaexp.start_to_end_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])\z/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.start_to_end_of_string { find(:a..:z) }).to eq(/\A[a-z]\z/)
       end
     end
 
@@ -439,30 +435,12 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.start_of_line).to eq(/^/)
         expect(Reggaexp.start_of_line(:a..:z)).to eq(/^[a-z]/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.start_of_line(:a..:z, capture: true)).to eq(/^([a-z])/)
-        expect(Reggaexp.start_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.start_of_line { find(:a..:z) }).to eq(/^[a-z]/)
-      end
     end
 
     context '#start_of_string' do
       it 'creates a pattern matching at start of string' do
         expect(Reggaexp.start_of_string).to eq(/\A/)
         expect(Reggaexp.start_of_string(:a..:z)).to eq(/\A[a-z]/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.start_of_string(:a..:z, capture: true)).to eq(/\A([a-z])/)
-        expect(Reggaexp.start_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.start_of_string { find(:a..:z) }).to eq(/\A[a-z]/)
       end
     end
 
@@ -471,15 +449,6 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.end_of_line).to eq(/$/)
         expect(Reggaexp.end_of_line(:a..:z)).to eq(/[a-z]$/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.end_of_line(:a..:z, capture: true)).to eq(/([a-z])$/)
-        expect(Reggaexp.end_of_line(:a..:z, as: :named)).to eq(/(?<named>[a-z])$/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.end_of_line { find(:a..:z) }).to eq(/[a-z]$/)
-      end
     end
 
     context '#end_of_string' do
@@ -487,29 +456,11 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.end_of_string).to eq(/\z/)
         expect(Reggaexp.end_of_string(:a..:z)).to eq(/[a-z]\z/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.end_of_string(:a..:z, capture: true)).to eq(/([a-z])\z/)
-        expect(Reggaexp.end_of_string(:a..:z, as: :named)).to eq(/(?<named>[a-z])\z/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.end_of_string { find(:a..:z) }).to eq(/[a-z]\z/)
-      end
     end
 
     context '#zero_or_one' do
       it 'creates a pattern matching zero or one occurence' do
         expect(Reggaexp.zero_or_one(:a)).to eq(/a?/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.zero_or_one(:a..:z, capture: true)).to eq(/([a-z]?)/)
-        expect(Reggaexp.zero_or_one(:a..:z, as: :named)).to eq(/(?<named>[a-z]?)/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.zero_or_one { find(:a..:z) }).to eq(/[a-z]?/)
       end
     end
 
@@ -517,29 +468,11 @@ RSpec.describe Reggaexp do
       it 'creates a pattern matching zero or more occurences' do
         expect(Reggaexp.zero_or_more(:a)).to eq(/a*/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.zero_or_more(:a..:z, capture: true)).to eq(/([a-z]*)/)
-        expect(Reggaexp.zero_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]*)/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.zero_or_more { find(:a..:z) }).to eq(/[a-z]*/)
-      end
     end
 
     context '#one_or_more' do
       it 'creates a pattern matching one or more occurences' do
         expect(Reggaexp.one_or_more(:a)).to eq(/a+/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.one_or_more(:a..:z, capture: true)).to eq(/([a-z]+)/)
-        expect(Reggaexp.one_or_more(:a..:z, as: :named)).to eq(/(?<named>[a-z]+)/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.one_or_more { find(:a..:z) }).to eq(/[a-z]+/)
       end
     end
 
@@ -547,44 +480,17 @@ RSpec.describe Reggaexp do
       it 'creates a pattern matching between [min] and [max] occurences' do
         expect(Reggaexp.between(1..4, :a)).to eq(/a{1,4}/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.between(1..4, :a, capture: true)).to eq(/(a{1,4})/)
-        expect(Reggaexp.between(1..4, :a, as: :named)).to eq(/(?<named>a{1,4})/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.between(1..4) { find(:a..:z) }).to eq(/[a-z]{1,4}/)
-      end
     end
 
     context '#at_most' do
       it 'creates a pattern matching at most [amount] occurences' do
         expect(Reggaexp.at_most(3, :a)).to eq(/a{,3}/)
       end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.at_most(3, :a, capture: true)).to eq(/(a{,3})/)
-        expect(Reggaexp.at_most(3, :a, as: :named)).to eq(/(?<named>a{,3})/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.at_most(3) { find(:a..:z) }).to eq(/[a-z]{,3}/)
-      end
     end
 
     context '#at_least' do
       it 'creates a pattern matching at least [amount] occurences' do
         expect(Reggaexp.at_least(3, :a)).to eq(/a{3,}/)
-      end
-
-      it 'creates a capture group' do
-        expect(Reggaexp.at_least(3, :a, capture: true)).to eq(/(a{3,})/)
-        expect(Reggaexp.at_least(3, :a, as: :named)).to eq(/(?<named>a{3,})/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.at_least(3) { find(:a..:z) }).to eq(/[a-z]{3,}/)
       end
     end
 
@@ -600,10 +506,6 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.not_preceded_by('a', capture: true)).to eq(/(?<!a)/)
         expect(Reggaexp.not_preceded_by('a', as: :named)).to eq(/(?<!a)/)
       end
-
-      it 'accepts a block' do
-        expect(Reggaexp.not_preceded_by { find(:a..:z) }).to eq(/(?<![a-z])/)
-      end
     end
 
     context '#preceded_by' do
@@ -617,10 +519,6 @@ RSpec.describe Reggaexp do
       it 'does not create a capture group' do
         expect(Reggaexp.preceded_by('a', capture: true)).to eq(/(?<=a)/)
         expect(Reggaexp.preceded_by('a', as: :named)).to eq(/(?<=a)/)
-      end
-
-      it 'accepts a block' do
-        expect(Reggaexp.preceded_by { find(:a..:z) }).to eq(/(?<=[a-z])/)
       end
     end
 
