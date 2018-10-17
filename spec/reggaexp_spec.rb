@@ -404,6 +404,36 @@ RSpec.describe Reggaexp do
   end
 
   context Reggaexp::Expression do
+    context '#start_to_end_of_line' do
+      it 'creates a pattern matching from start to end' do
+        expect(Reggaexp.start_to_end_of_line(:a)).to eq(/^a$/)
+      end
+
+      it 'creates a capture group' do
+        expect(Reggaexp.start_to_end_of_line(:a..:z, capture: true)).to eq(/^([a-z])$/)
+        expect(Reggaexp.start_to_end_of_line(:a..:z, as: :named)).to eq(/^(?<named>[a-z])$/)
+      end
+
+      it 'accepts a block' do
+        expect(Reggaexp.start_to_end_of_line { find(:a..:z) }).to eq(/^[a-z]$/)
+      end
+    end
+
+    context '#start_to_end_of_string' do
+      it 'creates a pattern matching from start to end' do
+        expect(Reggaexp.start_to_end_of_string(:a)).to eq(/\Aa\z/)
+      end
+
+      it 'creates a capture group' do
+        expect(Reggaexp.start_to_end_of_string(:a..:z, capture: true)).to eq(/\A([a-z])\z/)
+        expect(Reggaexp.start_to_end_of_string(:a..:z, as: :named)).to eq(/\A(?<named>[a-z])\z/)
+      end
+
+      it 'accepts a block' do
+        expect(Reggaexp.start_to_end_of_string { find(:a..:z) }).to eq(/\A[a-z]\z/)
+      end
+    end
+
     context '#start_of_line' do
       it 'creates a pattern matching at start of line' do
         expect(Reggaexp.start_of_line).to eq(/^/)
