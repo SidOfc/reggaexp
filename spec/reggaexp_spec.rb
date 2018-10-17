@@ -185,7 +185,9 @@ RSpec.describe Reggaexp do
         end
 
         it 'removes double (or more) capture groups' do
-          expect(Reggaexp.group { group { group { find(:a) } } }).to eq(/(?:a)/)
+          expect(Reggaexp.group { group { find(:a).or(:bcd) }.then(:q) }).to(
+            eq(/(?:a|bcd)q/)
+          )
         end
 
         it 'creates a capture group when capture: true is given' do
@@ -612,7 +614,7 @@ RSpec.describe Reggaexp do
                                .or { find('<').one_or_more(:word).then('>') }
                                .or(':')
                            }
-                       }.maybe).to eq(%r{\A\^?\((?:\?(?:(?:<?[!=])|<\w+>|:))?})
+                       }.maybe).to eq(%r{\A\^?\((?:\?(?:<?[!=]|<\w+>|:))?})
       end
     end
 

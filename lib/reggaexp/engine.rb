@@ -98,11 +98,13 @@ module Reggaexp
 
       flat_args = args.flatten
       flat_args = with_presets flat_args
+      strs      = strings(flat_args)
       atoms     = [*ranges(flat_args), *numerics(flat_args),
-                   *strings(flat_args), *symbols(flat_args),
+                   *strs, *symbols(flat_args),
                    *bools(flat_args)].uniq
 
       opts[:unescape_dot] = true if args.include? :any
+      opts[:long_strs]    = strs.any? { |s| s.tr('\\', '').length > 1 }
       append_clause atoms, opts
       self
     end
@@ -225,19 +227,10 @@ module Reggaexp
 
     # build the actual pattern
     def pattern
-      @pattern ||= Regexp.compile compiled_pattern, flag_value
-    end
-
-    def compiled_pattern
-      clauses.map.with_index do |atoms, idx|
-        opts = info_for_clause idx
-        strs = exprs_from_atoms atoms, **opts
-
-        next parse_atom idx, strs.first if strs.size == 1
-        next parse_atom idx, strs.join('|'), non_capture: !in_or?(**opts) if strs.any?
-
-        parse_atom idx, ''
-      end.join
+      @pattern ||= Regexp.compile(
+        clauses.map.with_index(&method(:clause_to_atom)).join,
+        flag_value
+      )
     end
 
     # comparison operators
@@ -317,14 +310,15 @@ module Reggaexp
 
     # parse atoms from a single 'parse' call
     # the content argument will be the atoms stringified
-    def parse_atom(clause_idx, content, **opts)
-      opts      = info_for_clause(clause_idx).merge opts
-      name      = opts.fetch :as, nil
-      capture   = opts.fetch :capture, name ? true : false
-      non_capt  = opts.fetch :non_capture, false
-      capt_type = non_capt ? '?:' : ''
-      close_or  = !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
-      open_or   = !alternating_or? && or_next?(**opts)  && !or_prev?(**opts)
+    def clause_to_atom(atoms, idx)
+      opts        = info_for_clause idx
+      name        = opts.fetch :as, nil
+      capture     = opts.fetch :capture, name ? true : false
+      non_capt    = in_or?(**opts)  ? false : opts.fetch(:non_capture, false)
+      non_capt  ||= alternating_or? ? false : opts.fetch(:long_strs,   false)
+      close_or    = !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
+      open_or     = !alternating_or? && or_next?(**opts)  && !or_prev?(**opts)
+      capt_type   = non_capt ? '?:' : ''
 
       return '|' if opts.key? :or
 
@@ -332,7 +326,7 @@ module Reggaexp
       str += opts.fetch :prepend, ''
       str += capture || non_capt ? '(' : ''
       str += (name ? "?<#{name}>" : capt_type)
-      str += maybe_with_quantifier(content, **opts)
+      str += maybe_with_quantifier(exprs_from_atoms(atoms, **opts).join('|'), **opts)
       str += capture || non_capt ? ')' : ''
       str += opts.fetch(:append, '')
       str + (close_or ? ')' : '')
@@ -415,7 +409,7 @@ module Reggaexp
 
     def strip_wrapping_group(input)
       input.gsub(%r{\)\z}, '')
-           .gsub(%r{\A[\\A^]?\((?:\?(?:(?:<?[!=])|<\w+>|:))?}, '')
+           .gsub(%r{\A[\\A^]?\((?:\?(?:<?[!=]|<\w+>|:))?}, '')
     end
 
     def sub_expr(reggaexp, **opts)
