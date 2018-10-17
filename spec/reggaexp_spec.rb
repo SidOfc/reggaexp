@@ -203,8 +203,9 @@ RSpec.describe Reggaexp do
           expect(match_data[:name]).to eq 'hello'
         end
 
-        it 'creates a non-capturing group around strings when not capturing' do
-          expect(Reggaexp.find('hello', 'goodbye')).to eq(/(?:hello|goodbye)/)
+        it 'creates a non-capturing group around strings when needed' do
+          expect(Reggaexp.find('hello', 'goodbye')).to eq(/hello|goodbye/)
+          expect(Reggaexp.find('hello', 'goodbye').then(:a)).to eq(/(?:hello|goodbye)a/)
         end
       end
 

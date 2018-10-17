@@ -230,10 +230,11 @@ module Reggaexp
 
     def compiled_pattern
       clauses.map.with_index do |atoms, idx|
-        strs = exprs_from_atoms atoms, **info_for_clause(idx)
+        opts = info_for_clause idx
+        strs = exprs_from_atoms atoms, **opts
 
         next parse_atom idx, strs.first if strs.size == 1
-        next parse_atom idx, strs.join('|'), non_capture: !in_or? if strs.any?
+        next parse_atom idx, strs.join('|'), non_capture: !in_or?(**opts) if strs.any?
 
         parse_atom idx, ''
       end.join
@@ -317,37 +318,30 @@ module Reggaexp
     # parse atoms from a single 'parse' call
     # the content argument will be the atoms stringified
     def parse_atom(clause_idx, content, **opts)
-      opts = info_for_clause(clause_idx).merge opts
+      opts      = info_for_clause(clause_idx).merge opts
+      name      = opts.fetch :as, nil
+      capture   = opts.fetch :capture, name ? true : false
+      non_capt  = opts.fetch :non_capture, false
+      capt_type = non_capt ? '?:' : ''
+      close_or  = !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
+      open_or   = !alternating_or? && or_next?(**opts)  && !or_prev?(**opts)
 
-      maybe_prepend(nil, **opts) +
-        maybe_with_capture(content, **opts) +
-        maybe_append(nil, **opts)
+      return '|' if opts.key? :or
+
+      str = open_or ? '(?:' : ''
+      str += opts.fetch :prepend, ''
+      str += capture || non_capt ? '(' : ''
+      str += (name ? "?<#{name}>" : capt_type)
+      str += maybe_with_quantifier(content, **opts)
+      str += capture || non_capt ? ')' : ''
+      str += opts.fetch(:append, '')
+      str + (close_or ? ')' : '')
     end
 
-    def in_or?
-      @in_or ? true : false
-    end
-
-    def maybe_prepend(content, **opts)
-      if !alternating_or? && !or_prev?(**opts) && or_next?(**opts)
-        @in_or = true
-        opening = '(?:'
-      end
-
-      return "#{opening}#{content}" unless opts.key? :prepend
-
-      "#{opening}#{opts[:prepend]}#{content}"
-    end
-
-    def maybe_append(content, **opts)
-      if !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
-        @in_or = false
-        closing = ')'
-      end
-
-      return "#{content}#{closing}" unless opts.key? :append
-
-      "#{content}#{opts[:append]}#{closing}"
+    def in_or?(**opts)
+      alternating_or? ||
+        (!or_prev?(**opts) && or_next?(**opts)) ||
+        (or_prev?(**opts)  && !or_next?(**opts))
     end
 
     # removes redundant quantifiers like {1,} or {1}
@@ -379,22 +373,6 @@ module Reggaexp
       return "#{content}{#{q}}" if q.to_s =~ /\A\d+\z/
 
       "#{content}#{q}"
-    end
-
-    # check if either a capture or non capture group must be generated
-    # from given opts.
-    def maybe_with_capture(content, **opts)
-      name      = opts.fetch :as, nil
-      capture   = opts.fetch :capture, name ? true : false
-      non_capt  = opts.fetch :non_capture, false
-      capt_type = non_capt ? '?:' : ''
-
-      return '|' if opts.key? :or
-
-      str  = (capture || non_capt ? '(' : '')
-      str += (name ? "?<#{name}>" : capt_type)
-      str += maybe_with_quantifier(content, **opts)
-      str + (capture || non_capt ? ')' : '')
     end
 
     # converts ranges to correct min-max format and puts
@@ -435,17 +413,21 @@ module Reggaexp
       mdl.all? { |l| l > frst && l > lst }
     end
 
+    def strip_wrapping_group(input)
+      input.gsub(%r{\)\z}, '')
+           .gsub(%r{\A[\\A^]?\((?:\?(?:(?:<?[!=])|<\w+>|:))?}, '')
+    end
+
     def sub_expr(reggaexp, **opts)
       outer_capture = opts[:capture] || opts[:as] || opts[:non_capture]
-      pat           = reggaexp.clear_flags!.add_flags(*flags).pattern
-                              .inspect.gsub(%r{\$?/\w*\z}, '/')
-                              .gsub(%r{(?<!\\)\\[Az]}, '')[1..-2]
+      pat           = reggaexp.clear_flags!.add_flags(*flags).pattern.inspect
+                              .gsub(%r{\$?/\w*\z}, '/')
+                              .gsub(%r{(?<!\\)\\[Az]}, '')
+                              .gsub(%r{\A\^}, '')[1..-2]
 
-      return [pat.gsub(%r{\A\^}, '')] \
-        unless outer_capture && reggaexp.pattern_entirely_grouped?
+      return [pat] unless outer_capture && reggaexp.pattern_entirely_grouped?
 
-      [pat.gsub(%r{\)\z}, '')
-          .gsub(%r{\A\^?\((?:\?(?:(?:<?[!=])|<\w+>|:))?}, '')]
+      [strip_wrapping_group(pat)]
     end
 
     # apply flags to atoms and remove duplicates
