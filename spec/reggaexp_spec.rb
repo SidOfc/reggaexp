@@ -629,26 +629,64 @@ RSpec.describe Reggaexp do
     end
   end
 
-  # This is going to be a fun one
-  context 'Replace regex used internally with Reggaexp' do
-    it 'could replace string character split regex' do
-      expect(Reggaexp.is('\\').or.not_preceded_by('\\')).to eq(/(?=\\)|(?<!\\)/)
-    end
-
-    it 'could replace start/end of string pattern regex' do
-      expect(Reggaexp.not_preceded_by('\\').then('\\').then('A', 'z')).to eq(
-        /(?<!\\)\\[Az]/
-      )
-    end
-
-    it 'could replace flag + end of line removal regex' do
-      expect(Reggaexp.maybe('$').then('/')
-                     .maybe_multiple(:word)
-                     .end_of_string).to eq(%r{\$?/\w*\z})
-    end
-  end
-
   context 'Examples' do
+    context 'Replace regex used internally with Reggaexp' do
+      it 'could replace the non-digit regex' do
+        expect(Reggaexp.start_to_end_of_string(:non_numeric)).to eq(/\A\D\z/)
+      end
+
+      it 'could replace the caret regex' do
+        expect(Reggaexp.start_of_string('^')).to eq(/\A\^/)
+      end
+
+      it 'could replace string character split regex' do
+        expect(Reggaexp.is('\\').or.not_preceded_by('\\')).to eq(/(?=\\)|(?<!\\)/)
+      end
+
+      it 'could replace start/end of string pattern regex' do
+        expect(Reggaexp.not_preceded_by('\\').then('\\').then('A', 'z')).to eq(
+          /(?<!\\)\\[Az]/
+        )
+      end
+
+      it 'could replace flag + end of line removal regex' do
+        expect(Reggaexp.maybe('$').then('/')
+                       .maybe_multiple(:word)
+                       .end_of_string).to eq(%r{\$?/\w*\z})
+      end
+
+      it 'could replace the plural to singular regex' do
+        expect(Reggaexp.preceded_by(:any)
+                       .end_of_string('s')).to eq(/(?<=.)s\z/)
+      end
+
+      it 'could replace the character range regex' do
+        expect(Reggaexp.start_of_string(:any)
+                       .then('-')
+                       .end_of_string(:any)).to eq(/\A.-.\z/)
+      end
+
+      it 'could replace the start/end of string regex' do
+        expect(Reggaexp.not_preceded_by('\\')
+                       .then('\\')
+                       .one_of('A', 'z')).to eq(/(?<!\\)\\[Az]/)
+      end
+
+      it 'remove expression capture group opening regex' do
+        expect(Reggaexp.start_of_string
+                       .maybe('^')
+                       .then('(')
+                       .group {
+                         find('?')
+                           .then {
+                               group { maybe('<').one_of('!', '=') }
+                               .or { find('<').one_or_more(:word).then('>') }
+                               .or(':')
+                           }
+                       }.maybe).to eq(%r{\A\^?\((?:\?(?:(?:<?[!=])|<\w+>|:))?})
+      end
+    end
+
     context 'Postal codes' do
       it 'matches an NL postal code' do
         pattern = Reggaexp

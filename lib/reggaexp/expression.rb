@@ -47,6 +47,14 @@ module Reggaexp
       remove_flag :m
     end
 
+    def start_to_end_of_line(*args, **opts, &block)
+      find(*args, **opts.merge(prepend: '^', append: '$'), &block)
+    end
+
+    def start_to_end_of_string(*args, **opts, &block)
+      find(*args, **opts.merge(prepend: '\A', append: '\z'), &block)
+    end
+
     def start_of_line(*args, **opts, &block)
       find(*args, **opts.merge(prepend: '^'), &block)
     end

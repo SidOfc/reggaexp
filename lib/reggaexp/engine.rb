@@ -11,24 +11,28 @@ module Reggaexp
     ESCAPE                 = %w[{ } ( ) [ ] | ? * + . ^ $ \\].freeze
     CHARACTER_CLASS_ESCAPE = %w{- ] \\}.freeze
     PRESETS                = {
-      word:       '\w',
-      number:     0..9,
-      letter:     'a'..'Z',
-      upper:      'A'..'Z',
-      lower:      'a'..'z',
-      whitespace: '\s',
-      space:      ' ',
-      tab:        '\t',
-      dot:        '.',
-      blank:      %i[space tab],
-      hex:        [:number, 'a'..'F'],
-      alphanum:   %i[letter number]
+      word:        '\w',
+      non_word:    '\W',
+      number:      0..9,
+      non_numeric: '\D',
+      letter:      'a'..'Z',
+      upper:       'A'..'Z',
+      lower:       'a'..'z',
+      whitespace:  '\s',
+      space:       ' ',
+      tab:         '\t',
+      dot:         '.',
+      blank:       %i[space tab],
+      hex:         [:number, 'a'..'F'],
+      alphanum:    %i[letter number]
     }.freeze
 
     PRESET_ALIASSES = {
       digit:     :number,
+      non_digit: :non_numeric,
       char:      :letter,
-      character: :letter
+      character: :letter,
+      any:       :dot
     }.freeze
 
     PRESET_KEYS = (PRESETS.keys + PRESET_ALIASSES.keys)
@@ -98,6 +102,7 @@ module Reggaexp
                    *strings(flat_args), *symbols(flat_args),
                    *bools(flat_args)].uniq
 
+      opts[:unescape_dot] = true if args.include? :any
       append_clause atoms, opts
       self
     end
@@ -138,7 +143,7 @@ module Reggaexp
     # filter symbol presets recursively
     def with_presets(flat_args)
       presets = flat_args.select(&Symbol.method(:===)).flat_map do |preset|
-        singular = preset.to_s.gsub(/(?<=.)s$/, '').to_sym
+        singular = preset.to_s.gsub(/(?<=.)s\z/, '').to_sym
         singular = PRESET_ALIASSES.fetch singular, singular
         value    = PRESETS[singular]
 
@@ -404,7 +409,9 @@ module Reggaexp
       opt_group = chars.size == 1 && chars.first !~ /\A.-.\z/
 
       if opt_group
-        strs << escape(unescape(chars.first))
+        char = escape unescape(chars.first)
+        char = char.gsub('\\.', '.') if opts.key? :unescape_dot
+        strs << char
       elsif chars.any?
         strs << "#{opt_group ? '' : '['}#{chars.join}#{opt_group ? '' : ']'}"
       end
@@ -438,7 +445,7 @@ module Reggaexp
         unless outer_capture && reggaexp.pattern_entirely_grouped?
 
       [pat.gsub(%r{\)\z}, '')
-          .gsub(%r{\A\^?\((?:\?(?:<?[!=]|<\w+>|:))?}, '')]
+          .gsub(%r{\A\^?\((?:\?(?:(?:<?[!=])|<\w+>|:))?}, '')]
     end
 
     # apply flags to atoms and remove duplicates
