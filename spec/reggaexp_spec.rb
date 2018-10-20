@@ -688,6 +688,54 @@ RSpec.describe Reggaexp do
       end
     end
 
+    context 'User agent' do
+      let!(:arch) do
+        Reggaexp
+          .capture {
+            group {
+              one_of('x', 'x86_', 'amd', 'wow', 'win').then('64')
+            }
+            .or {
+              find('i').one_of('3', '6').then('86')
+            }
+            .or(:arm)
+          }
+          .case_insensitive
+      end
+
+      let!(:locale) do
+        Reggaexp
+          .not_preceded_by(:nintendo)
+          .one_of(';', '(', :whitespace)
+          .not(:nt)
+          .group {
+            find(2, :letters)
+              .one_of('-', '_')
+              .group(2, :letters).maybe
+          }
+          .maybe('-')
+          .one_of(';', ')', '/')
+          .not(:digits)
+          .case_insensitive
+      end
+
+      it 'can create architecture detection regex' do
+        expect(arch).to eq(/((?:x86_|amd|wow|win|x)64|i[36]86|arm)/i)
+
+        expect(arch =~ 'x86_64').to be_truthy
+        expect(arch =~ 'x86_32').to be_falsy
+      end
+
+      it 'can create locale detection regex' do
+        expect(locale).to eq(
+           /(?<!nintendo)[;(\s](?!nt)(?:[a-z]{2}[\-_](?:[a-z]{2})?)-?[;)\/](?![0-9])/i
+        )
+
+        expect(locale =~ '(nl_NL)').to         be_truthy
+        expect(locale =~ 'nintendo(nl_NL)').to be_falsy
+      end
+    end
+
     context 'Email address' do
       let!(:pattern) do
         Reggaexp

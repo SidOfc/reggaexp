@@ -104,7 +104,7 @@ module Reggaexp
                    *bools(flat_args)].uniq
 
       opts[:unescape_dot] = true if %i[any dot].any? { |valid| args.include? valid }
-      opts[:long_strs]    = strs.any? { |s| s.tr('\\', '').length > 1 }
+      opts[:long_strs]    = strs.count { |s| s.tr('\\', '').length > 1 } > 1
       append_clause atoms, opts
       self
     end
