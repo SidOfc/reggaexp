@@ -465,17 +465,29 @@ RSpec.describe Reggaexp do
       it 'creates a pattern matching zero or one occurence' do
         expect(Reggaexp.zero_or_one(:a)).to eq(/a?/)
       end
+
+      it 'groups a clause with count correctly' do
+        expect(Reggaexp.maybe(2, :letters).case_insensitive).to eq(/(?:[a-z]{2})?/i)
+      end
     end
 
     context '#zero_or_more' do
       it 'creates a pattern matching zero or more occurences' do
         expect(Reggaexp.zero_or_more(:a)).to eq(/a*/)
       end
+
+      it 'groups a clause with count correctly' do
+        expect(Reggaexp.maybe_multiple(2, :letters).case_insensitive).to eq(/(?:[a-z]{2})*/i)
+      end
     end
 
     context '#one_or_more' do
       it 'creates a pattern matching one or more occurences' do
         expect(Reggaexp.one_or_more(:a)).to eq(/a+/)
+      end
+
+      it 'groups a clause with count correctly' do
+        expect(Reggaexp.one_or_more(2, :letters).case_insensitive).to eq(/(?:[a-z]{2})+/i)
       end
     end
 
@@ -719,6 +731,23 @@ RSpec.describe Reggaexp do
           .case_insensitive
       end
 
+      let!(:iphone) do
+        Reggaexp
+          .find(:ip)
+          .group { any_of(:a, :o).then(:d) }
+          .or(:hone)
+          .case_insensitive
+      end
+
+      let!(:http_accept) do
+        Reggaexp
+          .capture {
+            find(2, :word)
+              .group { one_of('_', '-').then(2, :word) }.maybe }
+              .group { find(';q=').capture { one_or_more(:digits, '.') } }.maybe
+              .case_insensitive
+      end
+
       it 'can create architecture detection regex' do
         expect(arch).to eq(/((?:x86_|amd|wow|win|x)64|i[36]86|arm)/i)
 
@@ -733,6 +762,21 @@ RSpec.describe Reggaexp do
 
         expect(locale =~ '(nl_NL)').to         be_truthy
         expect(locale =~ 'nintendo(nl_NL)').to be_falsy
+      end
+
+      it 'can capture locale information from http_accept header' do
+        expect(http_accept).to eq(/(\w{2}(?:[_\-]\w{2})?)(?:;q=([.0-9]+))?/i)
+
+        expect(http_accept =~ 'en-US;q=1').to be_truthy
+        expect(http_accept =~ 'en*US;q=1').to be_truthy
+        expect(http_accept =~ 'en-US;s=1').to be_truthy
+      end
+
+      it 'can identify iphones' do
+        expect(iphone).to eq(/ip(?:[ao]d|hone)/i)
+
+        expect(iphone =~ 'iphone').to be_truthy
+        expect(iphone =~ 'iphod').to  be_falsy
       end
     end
 

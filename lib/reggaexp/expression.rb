@@ -10,7 +10,7 @@ module Reggaexp
                    maybe_count.is_a?(Array)   ||
                    numeric_range?(maybe_count)
 
-      if quantifier
+      if arg_is_count? maybe_count
         return repeat(maybe_count.to_i, *args, **opts) if maybe_count.is_a? Numeric
 
         between(maybe_count.minmax, *args, **opts)
@@ -22,6 +22,13 @@ module Reggaexp
     end
     alias then   find
     alias one_of find
+    alias any_of find
+
+    def arg_is_count?(arg)
+      arg.is_a?(Numeric) ||
+        arg.is_a?(Array) ||
+        numeric_range?(arg)
+    end
 
     def case_insensitive
       add_flag :i
@@ -72,16 +79,22 @@ module Reggaexp
     end
 
     def one_or_more(*args, **opts, &block)
+      return group(*args, **opts, &block).one_or_more if arg_is_count? args[0]
+
       find(*args, **opts.merge(quantifier: '+'), &block)
     end
     alias at_least_one one_or_more
 
     def zero_or_more(*args, **opts, &block)
+      return group(*args, **opts, &block).zero_or_more if arg_is_count? args[0]
+
       find(*args, **opts.merge(quantifier: '*'), &block)
     end
     alias maybe_multiple zero_or_more
 
     def zero_or_one(*args, **opts, &block)
+      return group(*args, **opts, &block).zero_or_one if arg_is_count? args[0]
+
       find(*args, **opts.merge(quantifier: '?'), &block)
     end
     alias maybe zero_or_one
