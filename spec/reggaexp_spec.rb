@@ -4,7 +4,9 @@
 
 RSpec.describe Reggaexp do
   def clause(*args, **opts)
-    Reggaexp.find(*args, **opts).clauses.flatten
+    Reggaexp.find(*args, **opts).clauses
+            .map { |clause| clause[:content] }
+            .flatten
   end
 
   def character_class(*args)
@@ -19,7 +21,7 @@ RSpec.describe Reggaexp do
     context 'Argument parsing' do
       context 'Block' do
         it 'creates a sub-expression' do
-          expect(Reggaexp.find { one_or_more(:a).or(:abc) }.then(:q)).to eq(/(?:a+|abc)q/)
+          expect(Reggaexp.one_or_more(:a).or(:abc).then(:q)).to eq(/(?:a+|abc)q/)
         end
       end
 
@@ -184,12 +186,6 @@ RSpec.describe Reggaexp do
           )
         end
 
-        it 'removes double (or more) capture groups' do
-          expect(Reggaexp.group { group { find(:a).or(:bcd) }.then(:q) }).to(
-            eq(/(?:a|bcd)q/)
-          )
-        end
-
         it 'creates a capture group when capture: true is given' do
           match_data = Reggaexp.find('hello', capture: true).match('hello')
           expect(match_data[1]).to eq 'hello'
@@ -206,7 +202,7 @@ RSpec.describe Reggaexp do
         end
 
         it 'creates a non-capturing group around strings when needed' do
-          expect(Reggaexp.find('hello', 'goodbye')).to eq(/hello|goodbye/)
+          expect(Reggaexp.find('hello', 'goodbye')).to eq(/(?:hello|goodbye)/)
           expect(Reggaexp.find('hello', 'goodbye').then(:a)).to eq(/(?:hello|goodbye)a/)
         end
       end
@@ -494,18 +490,33 @@ RSpec.describe Reggaexp do
     context '#between' do
       it 'creates a pattern matching between [min] and [max] occurences' do
         expect(Reggaexp.between(1..4, :a)).to eq(/a{1,4}/)
+        expect(Reggaexp.between(1..4, :a, 'abc')).to eq(/(?:abc|a){1,4}/)
+      end
+
+      it 'wraps atoms in a group followed by quantifier when block given' do
+        expect(Reggaexp.between(1..4) { one_or_more(:a, 'abc') }).to eq(/(?:(?:abc|a)+){1,4}/)
       end
     end
 
     context '#at_most' do
       it 'creates a pattern matching at most [amount] occurences' do
         expect(Reggaexp.at_most(3, :a)).to eq(/a{,3}/)
+        expect(Reggaexp.at_most(3, :a, 'abc')).to eq(/(?:abc|a){,3}/)
+      end
+
+      it 'wraps atoms in a group followed by quantifier when block given' do
+        expect(Reggaexp.at_most(4) { one_or_more(:a, 'abc') }).to eq(/(?:(?:abc|a)+){,4}/)
       end
     end
 
     context '#at_least' do
       it 'creates a pattern matching at least [amount] occurences' do
         expect(Reggaexp.at_least(3, :a)).to eq(/a{3,}/)
+        expect(Reggaexp.at_least(3, :a, 'abc')).to eq(/(?:abc|a){3,}/)
+      end
+
+      it 'wraps atoms in a group followed by quantifier when block given' do
+        expect(Reggaexp.at_least(4) { one_or_more(:a, 'abc') }).to eq(/(?:(?:abc|a)+){4,}/)
       end
     end
 
@@ -619,14 +630,14 @@ RSpec.describe Reggaexp do
         expect(Reggaexp.start_of_string
                        .maybe('^')
                        .then('(')
-                       .group {
+                       .maybe {
                          find('?')
                            .then {
                                group { maybe('<').one_of('!', '=') }
-                               .or { find('<').one_or_more(:word).then('>') }
-                               .or(':')
+                                 .or { find('<').one_or_more(:word).then('>') }
+                                 .or(':')
                            }
-                       }.maybe).to eq(%r{\A\^?\((?:\?(?:<?[!=]|<\w+>|:))?})
+                       }).to eq(%r{\A\^?\((?:\?(?:<?[!=]|<\w+>|:))?})
       end
     end
 
@@ -744,7 +755,7 @@ RSpec.describe Reggaexp do
           .capture {
             find(2, :word)
               .group { one_of('_', '-').then(2, :word) }.maybe }
-              .group { find(';q=').capture { one_or_more(:digits, '.') } }.maybe
+              .maybe { find(';q=').capture { one_or_more(:digits, '.') } }
               .case_insensitive
       end
 
@@ -790,7 +801,7 @@ RSpec.describe Reggaexp do
           .then {
             find(:alphanum)
               .one_or_more(:alphanum, '-')
-              .group { find('.').one_or_more(:letter, '-') }.zero_or_more
+              .zero_or_more { find('.').one_or_more(:letter, '-') }
               .then('.')
               .one_or_more(:letter)
           }

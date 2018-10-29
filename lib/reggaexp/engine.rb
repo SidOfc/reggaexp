@@ -6,53 +6,19 @@ module Reggaexp
   class Engine
     attr_reader :clauses, :flags
 
-    # characters that need to be escaped outside and within a
-    # character-class respectively.
-    ESCAPE                 = %w[{ } ( ) [ ] | ? * + . ^ $ \\].freeze
-    CHARACTER_CLASS_ESCAPE = %w{- ] \\}.freeze
-    PRESETS                = {
-      word:        '\w',
-      non_word:    '\W',
-      number:      0..9,
-      non_numeric: '\D',
-      letter:      'a'..'Z',
-      upper:       'A'..'Z',
-      lower:       'a'..'z',
-      whitespace:  '\s',
-      space:       ' ',
-      tab:         '\t',
-      dot:         '.',
-      blank:       %i[space tab],
-      hex:         [:number, 'a'..'F'],
-      alphanum:    %i[letter number]
-    }.freeze
-
-    PRESET_ALIASSES = {
-      digit:     :number,
-      non_digit: :non_numeric,
-      char:      :letter,
-      character: :letter,
-      any:       :dot
-    }.freeze
-
-    PRESET_KEYS = (PRESETS.keys + PRESET_ALIASSES.keys)
-                  .flat_map { |k| [k, "#{k}s".to_sym] }.freeze
-
     def initialize(&block)
-      @clause_opts = []
-      @clauses     = []
-      @flags       = []
-      @pattern     = nil
-      @block       = block if block_given?
+      @clauses = []
+      @flags   = []
+      @pattern = nil
+      @block   = block if block_given?
 
       instance_eval(&@block) if @block
     end
 
     def reset
-      @clause_opts = []
-      @clauses     = []
-      @flags       = []
-      @pattern     = nil
+      @clauses = []
+      @flags   = []
+      @pattern = nil
 
       instance_eval(&@block) if @block
 
@@ -99,14 +65,18 @@ module Reggaexp
       flat_args = args.flatten
       flat_args = with_presets flat_args
       strs      = strings(flat_args)
-      atoms     = [*ranges(flat_args), *numerics(flat_args),
-                   *strs, *symbols(flat_args),
-                   *bools(flat_args)].uniq
+      atoms     = unify_atoms flat_args
 
       opts[:unescape_dot] = true if %i[any dot].any? { |valid| args.include? valid }
       opts[:long_strs]    = strs.count { |s| s.tr('\\', '').length > 1 } > 1
       append_clause atoms, opts
       self
+    end
+
+    def unify_atoms(flat_args)
+      [*ranges(flat_args), *numerics(flat_args),
+       *strings(flat_args), *symbols(flat_args),
+       *bools(flat_args)].uniq
     end
 
     # when a block is given, parse it in a new instance of self
@@ -228,7 +198,7 @@ module Reggaexp
     # build the actual pattern
     def pattern
       @pattern ||= Regexp.compile(
-        clauses.map.with_index(&method(:clause_to_atom)).join,
+        clauses.map(&method(:clause_to_atom)).join,
         flag_value
       )
     end
@@ -289,10 +259,10 @@ module Reggaexp
     end
 
     def alternating_or?
-      clauses  = @clause_opts.map { |h| h.key?(:or) }
-      expected = !clauses.shift
+      mapped   = clauses.map { |h| h.key?(:or) }
+      expected = !mapped.shift
 
-      clauses.all? do |bool|
+      mapped.any? && mapped.all? do |bool|
         alternated = bool == expected
         expected   = !expected
 
@@ -301,34 +271,33 @@ module Reggaexp
     end
 
     def or_prev?(**opts)
-      info_for_clause(opts[:clause] - 1).key? :or
+      clauses.fetch(opts[:clause] - 1, {}).key? :or
     end
 
     def or_next?(**opts)
-      info_for_clause(opts[:clause] + 1).key? :or
+      clauses.fetch(opts[:clause] + 1, {}).key?(:or)
     end
 
     # parse atoms from a single 'parse' call
     # the content argument will be the atoms stringified
-    def clause_to_atom(atoms, idx)
-      opts        = info_for_clause idx
-      name        = opts.fetch :as, nil
-      capture     = opts.fetch :capture, name ? true : false
-      non_capt    = in_or?(**opts)  ? false : opts.fetch(:non_capture, false)
-      non_capt  ||= alternating_or? ? false : opts.fetch(:long_strs,   false)
-      close_or    = !alternating_or? && !or_next?(**opts) && or_prev?(**opts)
-      open_or     = !alternating_or? && or_next?(**opts)  && !or_prev?(**opts)
+    def clause_to_atom(clause)
+      return '|' if clause.key? :or
+
+      name        = clause.fetch :as, nil
+      capture     = clause.fetch :capture, name ? true : false
+      non_capt    = in_or?(**clause)  ? false : clause.fetch(:non_capture, false)
+      non_capt  ||= alternating_or? ? false : clause.fetch(:long_strs, false)
+      close_or    = !alternating_or? && !or_next?(**clause) && or_prev?(**clause)
+      open_or     = !alternating_or? && or_next?(**clause)  && !or_prev?(**clause)
       capt_type   = non_capt ? '?:' : ''
 
-      return '|' if opts.key? :or
-
       str = open_or ? '(?:' : ''
-      str += opts.fetch :prepend, ''
+      str += clause.fetch :prepend, ''
       str += capture || non_capt ? '(' : ''
       str += (name ? "?<#{name}>" : capt_type)
-      str += maybe_with_quantifier(exprs_from_atoms(atoms, **opts).join('|'), **opts)
+      str += maybe_with_quantifier(exprs_from_atoms(clause).join('|'), **clause)
       str += capture || non_capt ? ')' : ''
-      str += opts.fetch(:append, '')
+      str += clause.fetch(:append, '')
       str + (close_or ? ')' : '')
     end
 
@@ -358,8 +327,7 @@ module Reggaexp
 
     # check if a quantifier is present in opts and process it
     def maybe_with_quantifier(content, **opts)
-      q = opts.fetch :quantifier, nil
-      q = maybe_simplify_quantifier q
+      q = maybe_simplify_quantifier opts.fetch(:quantifier, nil)
 
       return "#{content}{#{q.first},#{q.last}}" if q.is_a?(Array) ||
                                                    q.is_a?(Range)
@@ -371,10 +339,10 @@ module Reggaexp
 
     # converts ranges to correct min-max format and puts
     # all single chars in one character class
-    def exprs_from_atoms(atoms, **opts)
-      return sub_expr(atoms, **opts) if atoms.is_a? self.class
+    def exprs_from_atoms(clause)
+      return sub_expr(clause[:content], **clause) if clause[:content].is_a? self.class
 
-      atoms     = atoms_after_flags atoms
+      atoms     = atoms_after_flags clause[:content]
       chars     = character_class atoms
       chars     = chars.map { |c| c.is_a?(Range) ? range_bounds(c).join('-') : c }
       strs      = non_capturing_group atoms
@@ -382,7 +350,7 @@ module Reggaexp
 
       if opt_group
         char = escape unescape(chars.first)
-        char = char.gsub('\\.', '.') if opts.key? :unescape_dot
+        char = char.gsub('\\.', '.') if clause.key? :unescape_dot
         strs << char
       elsif chars.any?
         strs << "#{opt_group ? '' : '['}#{chars.join}#{opt_group ? '' : ']'}"
@@ -437,15 +405,9 @@ module Reggaexp
       (strs + rngs).uniq
     end
 
-    # grab options passed for a given #parse call
-    def info_for_clause(idx)
-      @clause_opts.detect { |h| h[:clause] == idx } || {}
-    end
-
     # append an clause to the end of the pattern and return self.
     def append_clause(content, opts)
-      @clause_opts << opts.merge(clause: @clauses.size)
-      @clauses     << content
+      @clauses << opts.merge({content: content, clause: @clauses.size})
 
       self
     end

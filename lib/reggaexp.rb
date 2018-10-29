@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'reggaexp/version'
+require 'reggaexp/presets'
 require 'reggaexp/engine'
 require 'reggaexp/expression'
 

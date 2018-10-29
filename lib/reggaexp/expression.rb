@@ -11,9 +11,9 @@ module Reggaexp
                    numeric_range?(maybe_count)
 
       if arg_is_count? maybe_count
-        return repeat(maybe_count.to_i, *args, **opts) if maybe_count.is_a? Numeric
+        return repeat(maybe_count, *args, **opts, &block) if maybe_count.is_a? Numeric
 
-        between(maybe_count.minmax, *args, **opts)
+        between([maybe_count.first, maybe_count.last], *args, **opts, &block)
       else
         args.unshift maybe_count unless maybe_count.nil?
 
@@ -78,42 +78,56 @@ module Reggaexp
       find(*args, **opts.merge(append: '\z'), &block)
     end
 
+    def group_atoms_before_action?(*args, &block)
+      block ||
+        arg_is_count?(args[0]) ||
+        exprs_from_atoms({content: unify_atoms(with_presets(args))}).size > 1
+    end
+
     def one_or_more(*args, **opts, &block)
-      return group(*args, **opts, &block).one_or_more if arg_is_count? args[0]
+      return group(*args, **opts.merge(append: '+'), &block) if group_atoms_before_action?(*args, &block)
 
       find(*args, **opts.merge(quantifier: '+'), &block)
     end
     alias at_least_one one_or_more
 
     def zero_or_more(*args, **opts, &block)
-      return group(*args, **opts, &block).zero_or_more if arg_is_count? args[0]
+      return group(*args, **opts.merge(append: '*'), &block) if group_atoms_before_action?(*args, &block)
 
       find(*args, **opts.merge(quantifier: '*'), &block)
     end
     alias maybe_multiple zero_or_more
 
     def zero_or_one(*args, **opts, &block)
-      return group(*args, **opts, &block).zero_or_one if arg_is_count? args[0]
+      return group(*args, **opts.merge(append: '?'), &block) if group_atoms_before_action?(*args, &block)
 
       find(*args, **opts.merge(quantifier: '?'), &block)
     end
     alias maybe zero_or_one
 
     def repeat(amount, *args, **opts, &block)
+      return group(*args, **opts.merge(append: "{#{amount}}"), &block) if group_atoms_before_action?(*args, &block)
+
       find(*args, **opts.merge(quantifier: "{#{amount}}"), &block)
     end
 
     def between(rng_or_ary, *args, **opts, &block)
+      return group(*args, **opts, &block).between(rng_or_ary) if group_atoms_before_action?(*args, &block)
+
       find(*args, **opts.merge(quantifier: [rng_or_ary.first, rng_or_ary.last]),
            &block)
     end
 
     def at_least(amount, *args, **opts, &block)
+      return group(*args, **opts, &block).at_least(amount) if group_atoms_before_action?(*args, &block)
+
       find(*args, **opts.merge(quantifier: [amount, nil]), &block)
     end
     alias min at_least
 
     def at_most(amount, *args, **opts, &block)
+      return group(*args, **opts, &block).at_most(amount) if group_atoms_before_action?(*args, &block)
+
       find(*args, **opts.merge(quantifier: [nil, amount]), &block)
     end
     alias max at_most
