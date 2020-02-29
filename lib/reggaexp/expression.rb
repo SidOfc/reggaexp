@@ -6,13 +6,8 @@ module Reggaexp
   # for users to create regular expressions with
   class Expression < Engine
     def find(maybe_count = nil, *args, **opts, &block)
-      quantifier = maybe_count.is_a?(Numeric) ||
-                   maybe_count.is_a?(Array)   ||
-                   numeric_range?(maybe_count)
-
       if arg_is_count? maybe_count
         return repeat(maybe_count, *args, **opts, &block) if maybe_count.is_a? Numeric
-
         between([maybe_count.first, maybe_count.last], *args, **opts, &block)
       else
         args.unshift maybe_count unless maybe_count.nil?
@@ -138,7 +133,7 @@ module Reggaexp
     end
 
     def capture(*args, **opts, &block)
-      find(*args, opts.merge(capture: true), &block)
+      find(*args, **opts.merge(capture: true), &block)
     end
 
     def not(*args, **opts, &block)

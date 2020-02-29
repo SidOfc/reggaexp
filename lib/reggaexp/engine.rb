@@ -62,8 +62,7 @@ module Reggaexp
       @pattern = nil
       return parse_block(**opts, &block) if block_given?
 
-      flat_args = args.flatten
-      flat_args = with_presets flat_args
+      flat_args = with_presets args.flatten
       strs      = strings(flat_args)
       atoms     = unify_atoms flat_args
 
@@ -415,7 +414,7 @@ module Reggaexp
     # returns all ranges in args with their #min and #max converted
     # to a string to allow for easier filtering of duplicates.
     def stringify_range_bounds(ranges)
-      ranges.map { |r| Range.new(r.first.to_s, r.last.to_s) }
+      ranges.map { |r| r.first.to_s..r.last.to_s }
     end
 
     # remove subranges from an array of ranges given in args.
@@ -455,14 +454,16 @@ module Reggaexp
 
     # check wether given range has numeric boundaries
     def numeric_range?(range)
-      return false unless range.respond_to?(:first) && range.respond_to?(:last)
+      return false unless range.respond_to?(:minmax) &&
+                          range.minmax.all?(&String.method(:===))
 
       range.first =~ /\A\d\z/ && range.last =~ /\A\d\z/ ? true : false
     end
 
     # check wether given range has character boundaries
     def character_range?(range)
-      return false unless range.respond_to?(:first) && range.respond_to?(:last)
+      return false unless range.respond_to?(:minmax) &&
+                          range.minmax.all?(&String.method(:===))
 
       range.first =~ /\A\D\z/ && range.last =~ /\A\D\z/ ? true : false
     end

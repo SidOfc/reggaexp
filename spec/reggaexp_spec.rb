@@ -67,8 +67,8 @@ RSpec.describe Reggaexp do
 
       context 'Ranges' do
         it 'converts range boundary types to strings' do
-          expect(clause(1..4, :b..:q, 's'..'u')).to(
-            contain_exactly('1'..'4', 'b'..'q', 's'..'u')
+          expect(clause(:b..:q, 1..4, 's'..'u')).to(
+            contain_exactly('b'..'q', '1'..'4', 's'..'u')
           )
         end
 
@@ -795,12 +795,12 @@ RSpec.describe Reggaexp do
       let!(:pattern) do
         Reggaexp
           .start_of_string(:word, '"')
-          .zero_or_more(:word, *%w[- . + "])
-          .then(:word, '"')
+          .zero_or_more(:word, *%w[- . + \\ $ % "])
+          .not_preceded_by('.')
           .then('@')
           .then {
             find(:alphanum)
-              .one_or_more(:alphanum, '-')
+              .zero_or_more(:alphanum, '-')
               .zero_or_more { find('.').one_or_more(:letter, '-') }
               .then('.')
               .one_or_more(:letter)
@@ -813,32 +813,31 @@ RSpec.describe Reggaexp do
           .end_of_string
       end
 
-      it 'can handle an email address regex' do
-        expect(pattern).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9A-Za-z][\-0-9A-Za-z]+(?:\.[\-A-Za-z]+)*\.[A-Za-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/)
-        expect(pattern.case_insensitive).to eq(/\A["\w][\-.+"\w]*["\w]@(?:[0-9a-z][\-0-9a-z]+(?:\.[\-a-z]+)*\.[a-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/i)
+      it 'can create an email address regex' do
+        expect(pattern).to eq(/\A["\w][\-.+\\$%"\w]*(?<!\.)@(?:[0-9A-Za-z][\-0-9A-Za-z]*(?:\.[\-A-Za-z]+)*\.[A-Za-z]+|(?:[0-9]{3}\.){3}[0-9]{3})\z/)
       end
 
-      it 'identifies invalid email formats' do
-        ['plainaddress', '@domain.com', 'Joe Smith <email@domain.com>',
-         'email.domain.com', 'email@domain@domain.com', 'pizzaconpiña@gmail.com',
-         'pizzaConpiña@gmail.COM', 'email@111.222.333.44444.555',
-         'email@domain..com', 'email@domain.com (Joe Smith)', 'email@domain',
-         'almedinagirón2013@hotmail.com', 'scsdfhgsdfj;ghsrf@gmail.com',
-         'Fabíola.diniz37@gmail.com', 'something else@gmail.com',
-         'аmazon@amazon.com', 'email@-domain.com', '#@%^%#$@#$@#.com',
-         'email.@domain.com', '.email@domain.com'].each do |invalid|
+      ['plainaddress', '@domain.com', 'Joe Smith <email@domain.com>',
+       'email.domain.com', 'email@domain@domain.com', 'pizzaconpiña@gmail.com',
+       'pizzaConpiña@gmail.COM', 'email@111.222.333.44444.555',
+       'email@domain..com', 'email@domain.com (Joe Smith)', 'email@domain',
+       'almedinagirón2013@hotmail.com', 'scsdfhgsdfj;ghsrf@gmail.com',
+       'Fabíola.diniz37@gmail.com', 'something else@gmail.com',
+       'аmazon@amazon.com', 'email@-domain.com', '#@%^%#$@#$@#.com',
+       'email.@domain.com', '.email@domain.com'].each do |invalid|
+        it "identifies invalid email formats: '#{invalid}'" do
           expect(pattern =~ invalid).to be_falsy
         end
       end
 
-      it 'identifies valid email formats' do
-        ['valid@gmail.com', 'VALID@GMAIL.com', 'something_else@gmail.com',
-         'something@yahoo.fr', 'hello123@gmail123.com',
-         'firstname.lastname@domain.com', 'email@subdomain.domain.com',
-         'firstname+lastname@domain.com', '_______@domain.com',
-         'email@domain.name', 'email@domain.co.jp',
-         'firstname-lastname@domain.com', '"email"@domain.com',
-         'email@111.222.333.444'].each do |valid|
+      ['valid@gmail.com', 'VALID@GMAIL.com', 'something_else@gmail.com',
+       'something@yahoo.fr', 'hello123@gmail123.com',
+       'firstname.lastname@domain.com', 'email@subdomain.domain.com',
+       'firstname+lastname@domain.com', '_______@domain.com',
+       'email@domain.name', 'email@domain.co.jp',
+       'firstname-lastname@domain.com', '"email"@domain.com',
+       'email@111.222.333.444', 'a@b.c'].each do |valid|
+        it "identifies valid email formats: '#{valid}'" do
            expect(pattern =~ valid).to be_truthy
          end
       end

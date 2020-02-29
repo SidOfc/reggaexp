@@ -7,8 +7,8 @@ require 'reggaexp/expression'
 
 # Reggaexp main module
 module Reggaexp
-  def self.method_missing(method, *args, &block)
-    Expression.new.send method, *args, &block
+  def self.method_missing(method, *args, **opts, &block)
+    Expression.new.send method, *args, **opts, &block
   end
 
   def self.respond_to_missing?(*)
